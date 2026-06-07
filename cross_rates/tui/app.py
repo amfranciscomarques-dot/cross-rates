@@ -25,9 +25,13 @@ from cross_rates.nucleo import (
     CotacaoInvalida,
     GrafoCambial,
     SemPercurso,
+    TaxaJuro,
+    arbitragem_a_prazo,
     arbitragens_geograficas,
     arbitragens_triangulares,
     cross,
+    forward,
+    normaliza_moeda,
 )
 
 # Exemplos do caderno para arranque rápido.
@@ -45,6 +49,9 @@ EXEMPLOS_GEOGRAFICA = [  # Ex. 15 — EUR/USD em duas praças
     ("EUR", "USD", "1.1574", "1.1576", "Paris"),
     ("EUR", "USD", "1.1583", "1.1585", "Londres"),
 ]
+EXEMPLOS_FORWARD_SPOT = ("CHF", "USD", "1.2745", "1.2748")  # Ex. 27 (spot)
+# Forward CHF/USD a 180d + forward de mercado 1,3076–1,3079 (tem arbitragem):
+EXEMPLO_FORWARD_INPUT = "CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079"
 
 INTRO = (
     "[b]Cross-rates & arbitragem[/b] — bid/ask. Notação [b]BASE/COTADA[/b]: a "
@@ -88,7 +95,17 @@ A→B→C→A cujo [b]produto das taxas[/b] (já com bid/ask) seja [b]> 1[/b].
      fator > 1  ⇒  ganho certo = (fator − 1) × montante inicial
 Equivale a "cross implícito ≠ cotação direta". Risco nulo: pernas simultâneas.
 
-[b]6. Como esta ferramenta calcula[/b]
+[b]6. Forward (taxa a prazo) — Paridade das Taxas de Juro (PTJ)[/b]
+Câmbio fixado hoje para troca numa data futura. A taxa de equilíbrio é a que
+impede a arbitragem com a réplica no mercado monetário (não é uma previsão):
+     F = S × (1 + i_cotada·n/360) ÷ (1 + i_base·n/360)
+  • i_cotada > i_base → F > S: base a [b]prémio[/b].
+  • i_cotada < i_base → F < S: base a [b]desconto[/b].
+Com bid/ask: F_bid usa i_bid(cotada) e i_ask(base); F_ask troca as pontas.
+[b]Arbitragem a prazo:[/b] se o forward de mercado sai do intervalo de
+equilíbrio, vende-se o que está caro e replica-se via MMI o que está barato.
+
+[b]7. Como esta ferramenta calcula[/b]
 Cada cotação BASE/COTADA gera duas conversões dirigidas:
   BASE→COTADA à taxa bid   ;   COTADA→BASE à taxa 1/ask.
 bid do cross = taxa do percurso BASE→…→COTADA; ask = 1/(taxa COTADA→…→BASE).
@@ -111,7 +128,7 @@ class CrossRatesApp(App):
     #corpo { height: 1fr; }
     #esquerda { width: 3fr; padding: 0 1; }
     #direita { width: 2fr; padding: 0 1; border-left: solid $accent; }
-    #resultado, #arb {
+    #resultado, #arb, #forward_res {
         height: auto; padding: 1; border: round $accent; margin: 1 0;
     }
     #teoria { padding: 1; }
@@ -127,6 +144,7 @@ class CrossRatesApp(App):
         ("e", "exemplos_cross", "Ex. cross"),
         ("x", "exemplos_arbitragem", "Ex. triangular"),
         ("g", "exemplos_geografica", "Ex. geográfica"),
+        ("f", "exemplos_forward", "Ex. forward"),
         ("l", "limpar", "Limpar"),
         ("t", "teoria", "Teoria"),
     ]
@@ -174,6 +192,20 @@ class CrossRatesApp(App):
                     id="montante",
                 )
                 yield Static("Sem análise de arbitragem ainda.", id="arb")
+
+                yield Label("Forward (taxa a prazo, PTJ)  [tecla f]", classes="rotulo")
+                yield Static(
+                    "BASE COTADA dias  i_base(bid ask)  i_cotada(bid ask)  "
+                    "[fwd_bid fwd_ask]. O spot vem da tabela; juros em % anual "
+                    "(base 360). Com o forward de mercado no fim, verifica também "
+                    "a arbitragem a prazo (usa o montante acima, na base).",
+                    classes="dica",
+                )
+                yield Input(
+                    placeholder="ex.: CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079",
+                    id="forward",
+                )
+                yield Static("Sem cálculo de forward ainda.", id="forward_res")
             with VerticalScroll(id="direita"):
                 yield Static(TEORIA, id="teoria")
         yield Footer()
@@ -206,6 +238,15 @@ class CrossRatesApp(App):
             self._adicionar_cotacao(Cotacao(*args))
         self._info("Exemplos de arbitragem geográfica carregados (Ex. 15). Prima [a].")
 
+    def action_exemplos_forward(self) -> None:
+        self._adicionar_cotacao(Cotacao(*EXEMPLOS_FORWARD_SPOT))
+        self.query_one("#forward", Input).value = EXEMPLO_FORWARD_INPUT
+        self._info(
+            "Exemplo de forward carregado (Ex. 27): spot CHF/USD na tabela e o "
+            "input preenchido com juros e forward de mercado. Prima Enter no "
+            "campo de forward (tem arbitragem a prazo)."
+        )
+
     def action_teoria(self) -> None:
         painel = self.query_one("#direita", VerticalScroll)
         painel.display = not painel.display
@@ -228,6 +269,8 @@ class CrossRatesApp(App):
             self._tratar_calculo(texto)
         elif evento.input.id == "montante":
             self.action_arbitragem()
+        elif evento.input.id == "forward" and texto:
+            self._tratar_forward(texto)
 
     def _tratar_adicao(self, texto: str, campo: Input) -> None:
         try:
@@ -250,6 +293,48 @@ class CrossRatesApp(App):
             self._erro(str(exc))
             return
         self._mostrar_resultado(r)
+
+    def _tratar_forward(self, texto: str) -> None:
+        partes = texto.replace(",", ".").split()
+        if len(partes) not in (7, 9):
+            self._erro_forward(
+                "Formato: BASE COTADA dias i_base_bid i_base_ask i_cot_bid "
+                "i_cot_ask [fwd_bid fwd_ask]."
+            )
+            return
+        base, cotada, dias = partes[0], partes[1], partes[2]
+        spot = self._spot_para(base, cotada)
+        if spot is None:
+            self._erro_forward(
+                f"Sem spot {base.upper()}/{cotada.upper()} na tabela — adicione a "
+                "cotação à vista primeiro."
+            )
+            return
+        try:
+            n = int(dias)
+            juro_base = TaxaJuro(base, partes[3], partes[4])
+            juro_cotada = TaxaJuro(cotada, partes[5], partes[6])
+            r = forward(spot, juro_base, juro_cotada, n)
+            arb = None
+            if len(partes) == 9:
+                arb = arbitragem_a_prazo(
+                    spot, juro_base, juro_cotada, n, partes[7], partes[8]
+                )
+        except (CotacaoInvalida, ValueError) as exc:
+            self._erro_forward(str(exc))
+            return
+        self._mostrar_forward(r, arb)
+
+    def _spot_para(self, base: str, cotada: str) -> Cotacao | None:
+        """Spot ``base/cotada`` a partir da tabela (invertendo se necessário)."""
+        c = self.grafo.cotacao_do_par(base, cotada)
+        if c is None:
+            return None
+        base, cotada = normaliza_moeda(base), normaliza_moeda(cotada)
+        if c.base == base and c.cotada == cotada:
+            return c
+        # cotação na orientação inversa: bid' = 1/ask, ask' = 1/bid
+        return Cotacao(base, cotada, Decimal(1) / c.ask, Decimal(1) / c.bid)
 
     def _le_montante(self) -> Decimal | None | bool:
         """Devolve o montante (Decimal), ``None`` se vazio, ``False`` se inválido."""
@@ -338,6 +423,47 @@ class CrossRatesApp(App):
                     )
             linhas.append("")
         alvo.update("\n".join(linhas).rstrip())
+
+    def _mostrar_forward(self, r, arb) -> None:
+        linhas = [
+            f"[b]{r.par}[/b] forward {r.dias}d  =  [green]{_fmt(r.bid, 4)}[/green] – "
+            f"[red]{_fmt(r.ask, 4)}[/red]    (spread {_fmt(r.spread, 4)})",
+            f"[b]spot:[/b] {_fmt(r.spot_bid)} – {_fmt(r.spot_ask)}    "
+            f"[b]pontos:[/b] {_fmt(r.pontos_bid, 4)} / {_fmt(r.pontos_ask, 4)}    "
+            f"[b]base a {r.sinal}[/b]",
+            f"  {r.bid_formula}",
+            f"  {r.ask_formula}",
+            f"[i]{r.nota}[/i]",
+        ]
+        if arb is not None:
+            montante = self._le_montante()
+            linhas.append("")
+            linhas.append("[b u]Arbitragem a prazo[/b u]")
+            linhas.append(
+                f"  mercado {_fmt(arb.mercado_bid, 4)}–{_fmt(arb.mercado_ask, 4)} "
+                f"vs equilíbrio {_fmt(arb.equilibrio_bid, 4)}–"
+                f"{_fmt(arb.equilibrio_ask, 4)}"
+            )
+            linhas.append(
+                f"  → [b]{arb.sentido}[/b] @ {_fmt(arb.taxa_mercado, 4)}; "
+                f"sintético {_fmt(arb.sintetico, 6)}  "
+                f"([green]+{_fmt(arb.ganho_pct, 4)}%[/green])"
+            )
+            if isinstance(montante, Decimal):
+                linhas.append(
+                    f"  lucro ≈ [b green]+{_fmt(arb.lucro(montante), 2)} "
+                    f"{arb.cotada}[/b green]  (por {_fmt(montante)} {arb.base})"
+                )
+        elif len(self.query_one("#forward", Input).value.split()) == 9:
+            linhas.append("")
+            linhas.append(
+                "[b]Sem arbitragem a prazo:[/b] o forward de mercado está dentro "
+                "do intervalo de equilíbrio (preços consistentes com a PTJ)."
+            )
+        self.query_one("#forward_res", Static).update("\n".join(linhas))
+
+    def _erro_forward(self, msg: str) -> None:
+        self.query_one("#forward_res", Static).update(f"[b red]Erro:[/b red] {msg}")
 
     def _info(self, msg: str) -> None:
         self.query_one("#resultado", Static).update(msg)

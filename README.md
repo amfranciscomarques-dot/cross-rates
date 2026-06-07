@@ -26,8 +26,14 @@ Na TUI:
    `EUR USD 1.1574 1.1576 Paris`. A fonte (praça/banco) é opcional.
 2. **Calcular cross** — escreva `BASE COTADA`, ex.: `GBP SEK`.
 3. **Arbitragem** — tecla `a` (geográfica + triangular; opcionalmente com montante).
-4. Atalhos: `e` exemplos de cross, `x` exemplos triangular, `g` exemplos
-   geográfica, `t` painel de teoria, `l` limpa a tabela, `q` sai.
+4. **Forward (PTJ)** — escreva `BASE COTADA dias i_base_bid i_base_ask
+   i_cot_bid i_cot_ask [fwd_bid fwd_ask]`, ex.:
+   `CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079`. O spot vem da
+   tabela; os juros são em % anual (base 360). Com a cotação forward de mercado
+   no fim, verifica também a **arbitragem a prazo**.
+5. Atalhos: `e` exemplos de cross, `x` exemplos triangular, `g` exemplos
+   geográfica, `f` exemplo de forward, `t` painel de teoria, `l` limpa a
+   tabela, `q` sai.
 
 O resultado do cross mostra `bid – ask`, `spread`, **tipo** (direta / inversa /
 cross direto ÷ / cross indireto ×), o **percurso**, as **fórmulas** bid/ask com
@@ -73,12 +79,14 @@ cross_rates/
     grafo.py        # GrafoCambial: moedas (nós) e conversões (arestas)
     cross.py        # cross(): cross-rate + percurso + tipo + fórmulas + nota
     arbitragem.py   # arbitragens_geograficas() e _triangulares()
+    forward.py      # forward() PTJ + arbitragem_a_prazo() (TaxaJuro)
   tui/
-    app.py          # interface Textual (cross, arbitragem, teoria)
+    app.py          # interface Textual (cross, arbitragem, forward, teoria)
   __main__.py       # python -m cross_rates
 testes/
   test_cross.py     # trancado às resoluções do Caderno (Ex. 10/11/12/17)
-  test_arbitragem.py# trancado a Ex. 17/18
+  test_arbitragem.py# trancado a Ex. 15/16/17/18
+  test_forward.py   # trancado a Ex. 21b/22b/23/27/28
   test_tui.py       # fluxo headless da interface
 ```
 
@@ -106,12 +114,32 @@ uma já na ponta bid/ask correta) é **> 1**:
 É a forma unificada da regra do caderno "cross implícito ≠ cotação direta".
 Risco nulo, porque as pernas são simultâneas. Ver `arbitragens_triangulares()`.
 
+## Forwards (taxas a prazo) — PTJ
+
+A taxa **forward** de equilíbrio resulta da **Paridade das Taxas de Juro coberta
+(PTJ/CIP)**: é a taxa que impede a arbitragem entre o forward direto e a réplica
+no Mercado Monetário Internacional (não é uma previsão da cotação futura). Para
+o par `BASE/COTADA`, a `dias` dias na base `n/360`:
+
+    F = S × (1 + i_cotada·n/360) ÷ (1 + i_base·n/360)
+
+- `i_cotada > i_base` → `F > S`: a base cotiza-se **a prémio**;
+- `i_cotada < i_base` → `F < S`: a base **a desconto**.
+
+Com bid/ask, cada ponta combina as pernas que desfavorecem o cliente:
+`F_bid = S_bid·(1+i_bid_cot·t)/(1+i_ask_base·t)` e
+`F_ask = S_ask·(1+i_ask_cot·t)/(1+i_bid_base·t)`. Ver `forward()` e `TaxaJuro`.
+
+**Arbitragem a prazo (covered interest arbitrage)** — quando o forward cotado no
+mercado sai do intervalo de equilíbrio, há lucro certo: vende-se a ponta cara e
+replica-se via MMI a barata. Ver `arbitragem_a_prazo()`.
+
 ## Roteiro (próximas fases)
 
 Tudo assenta no mesmo `GrafoCambial`:
 
 - ~~**Arbitragem triangular** — cross implícito vs. cotado (Ex. 17–18).~~ ✅ feito.
 - ~~**Arbitragem geográfica** — mesmo par em praças diferentes (Ex. 15–16).~~ ✅ feito.
-- **Forwards / PTJ** — taxas a prazo com bid/ask (Ex. 21–29).
+- ~~**Forwards / PTJ** — taxas a prazo com bid/ask + arbitragem a prazo (Ex. 21–29).~~ ✅ feito.
 - **Swaps cambiais** — spot + forward de sinais opostos (Ex. 30).
 - **Feeds em tempo real** — fonte de preços conectável (broker/exchange).

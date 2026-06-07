@@ -30,6 +30,26 @@ async def test_fluxo_adicionar_e_calcular():
 
 
 @pytest.mark.asyncio
+async def test_forward_na_tui():
+    app = CrossRatesApp()
+    async with app.run_test() as pilot:
+        app.action_exemplos_forward()  # Ex. 27: spot CHF/USD + input preenchido
+        await pilot.pause()
+        assert len(app.grafo.cotacoes) == 1
+
+        campo = app.query_one("#forward")
+        campo.focus()
+        await pilot.pause()
+        await pilot.press("enter")  # input já vem preenchido pelo exemplo
+        await pilot.pause()
+
+        conteudo = str(app.query_one("#forward_res").render())
+        assert "forward" in conteudo.lower()
+        assert "prémio" in conteudo.lower()  # i_USD > i_CHF → CHF a prémio
+        assert "arbitragem a prazo" in conteudo.lower()
+
+
+@pytest.mark.asyncio
 async def test_arbitragem_na_tui():
     app = CrossRatesApp()
     async with app.run_test() as pilot:

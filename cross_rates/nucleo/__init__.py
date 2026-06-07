@@ -13,6 +13,13 @@ from .arbitragem import (
 )
 from .cotacao import Cotacao, CotacaoInvalida, normaliza_moeda
 from .cross import ResultadoCross, cross
+from .forward import (
+    ArbitragemPrazo,
+    ResultadoForward,
+    TaxaJuro,
+    arbitragem_a_prazo,
+    forward,
+)
 from .grafo import GrafoCambial, SemPercurso
 
 __all__ = [
@@ -28,4 +35,9 @@ __all__ = [
     "Passo",
     "arbitragens_triangulares",
     "arbitragens_geograficas",
+    "TaxaJuro",
+    "ResultadoForward",
+    "ArbitragemPrazo",
+    "forward",
+    "arbitragem_a_prazo",
 ]
