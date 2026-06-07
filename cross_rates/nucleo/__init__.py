@@ -4,7 +4,13 @@ Totalmente testável de forma isolada. A TUI (e, mais tarde, motores de
 arbitragem e feeds de preços em tempo real) assentam sobre estas classes.
 """
 
-from .arbitragem import Arbitragem, Passo, arbitragens_triangulares
+from .arbitragem import (
+    Arbitragem,
+    ArbitragemGeografica,
+    Passo,
+    arbitragens_geograficas,
+    arbitragens_triangulares,
+)
 from .cotacao import Cotacao, CotacaoInvalida, normaliza_moeda
 from .cross import ResultadoCross, cross
 from .grafo import GrafoCambial, SemPercurso
@@ -18,6 +24,8 @@ __all__ = [
     "ResultadoCross",
     "cross",
     "Arbitragem",
+    "ArbitragemGeografica",
     "Passo",
     "arbitragens_triangulares",
+    "arbitragens_geograficas",
 ]

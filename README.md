@@ -22,11 +22,12 @@ python -m cross_rates        # abre a interface de terminal (TUI)
 
 Na TUI:
 
-1. **Adicionar cotação** — escreva `BASE COTADA bid ask`, ex.: `EUR USD 1.0850 1.0852`.
+1. **Adicionar cotação** — escreva `BASE COTADA bid ask [fonte]`, ex.:
+   `EUR USD 1.1574 1.1576 Paris`. A fonte (praça/banco) é opcional.
 2. **Calcular cross** — escreva `BASE COTADA`, ex.: `GBP SEK`.
-3. **Arbitragem triangular** — tecla `a` (opcionalmente com um montante).
-4. Atalhos: `e` exemplos de cross, `x` exemplos de arbitragem, `t` painel de
-   teoria, `l` limpa a tabela, `q` sai.
+3. **Arbitragem** — tecla `a` (geográfica + triangular; opcionalmente com montante).
+4. Atalhos: `e` exemplos de cross, `x` exemplos triangular, `g` exemplos
+   geográfica, `t` painel de teoria, `l` limpa a tabela, `q` sai.
 
 O resultado do cross mostra `bid – ask`, `spread`, **tipo** (direta / inversa /
 cross direto ÷ / cross indireto ×), o **percurso**, as **fórmulas** bid/ask com
@@ -71,7 +72,7 @@ cross_rates/
     cotacao.py      # Cotacao: par, bid, ask (+ validação)
     grafo.py        # GrafoCambial: moedas (nós) e conversões (arestas)
     cross.py        # cross(): cross-rate + percurso + tipo + fórmulas + nota
-    arbitragem.py   # arbitragens_triangulares(): ciclos com fator > 1
+    arbitragem.py   # arbitragens_geograficas() e _triangulares()
   tui/
     app.py          # interface Textual (cross, arbitragem, teoria)
   __main__.py       # python -m cross_rates
@@ -90,10 +91,15 @@ pytest
 Os testes do cross-rate reproduzem exercícios resolvidos (Ex. 10, 11, 12, 17),
 validando em simultâneo a matemática e a convenção bid/ask.
 
-## Arbitragem triangular
+## Arbitragem
 
-Uma arbitragem é um **ciclo de 3 moedas** `A→B→C→A` cujo produto das taxas
-(cada uma já na ponta bid/ask correta) é **> 1**:
+**Geográfica (espacial)** — mesmo par cotado em praças diferentes (campo `fonte`).
+Há ganho certo se o `ask` mais baixo (compra da base) for inferior ao `bid` mais
+alto (venda): `ask(A) < bid(B)` → compra em A, vende em B. Ver
+`arbitragens_geograficas()`.
+
+**Triangular** — um **ciclo de 3 moedas** `A→B→C→A` cujo produto das taxas (cada
+uma já na ponta bid/ask correta) é **> 1**:
 
     fator > 1  ⇒  ganho certo = (fator − 1) × montante inicial
 
@@ -105,8 +111,7 @@ Risco nulo, porque as pernas são simultâneas. Ver `arbitragens_triangulares()`
 Tudo assenta no mesmo `GrafoCambial`:
 
 - ~~**Arbitragem triangular** — cross implícito vs. cotado (Ex. 17–18).~~ ✅ feito.
-- **Arbitragem geográfica** — mesmo par em praças diferentes (Ex. 15–16);
-  requer arestas multi-fonte no grafo.
+- ~~**Arbitragem geográfica** — mesmo par em praças diferentes (Ex. 15–16).~~ ✅ feito.
 - **Forwards / PTJ** — taxas a prazo com bid/ask (Ex. 21–29).
 - **Swaps cambiais** — spot + forward de sinais opostos (Ex. 30).
 - **Feeds em tempo real** — fonte de preços conectável (broker/exchange).

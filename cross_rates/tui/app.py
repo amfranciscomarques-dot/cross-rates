@@ -20,10 +20,12 @@ from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 
 from cross_rates.nucleo import (
     Arbitragem,
+    ArbitragemGeografica,
     Cotacao,
     CotacaoInvalida,
     GrafoCambial,
     SemPercurso,
+    arbitragens_geograficas,
     arbitragens_triangulares,
     cross,
 )
@@ -38,6 +40,10 @@ EXEMPLOS_ARBITRAGEM = [  # Ex. 17 — triângulo GBP/JPY/EUR com arbitragem
     ("GBP", "JPY", "212.646", "212.689"),
     ("EUR", "JPY", "183.618", "183.646"),
     ("GBP", "EUR", "1.1559", "1.1561"),
+]
+EXEMPLOS_GEOGRAFICA = [  # Ex. 15 — EUR/USD em duas praças
+    ("EUR", "USD", "1.1574", "1.1576", "Paris"),
+    ("EUR", "USD", "1.1583", "1.1585", "Londres"),
 ]
 
 INTRO = (
@@ -70,13 +76,19 @@ uma moeda intermédia nunca contorna a margem.
 
 Identificar onde está a moeda comum (ao certo/ao incerto) é o passo decisivo.
 
-[b]4. Arbitragem triangular[/b]
+[b]4. Arbitragem geográfica (espacial)[/b]
+Mesmo par cotado em praças diferentes. Há ganho certo se o [b]ask mais baixo[/b]
+(onde se compra a base) for inferior ao [b]bid mais alto[/b] (onde se vende):
+     ask(praça A) < bid(praça B)  ⇒  compra em A, vende em B
+Indique a praça/banco na cotação (5.º campo). Ganho na moeda cotada.
+
+[b]5. Arbitragem triangular[/b]
 Inconsistência entre três pares na mesma praça. No grafo: um ciclo de 3 moedas
 A→B→C→A cujo [b]produto das taxas[/b] (já com bid/ask) seja [b]> 1[/b].
      fator > 1  ⇒  ganho certo = (fator − 1) × montante inicial
 Equivale a "cross implícito ≠ cotação direta". Risco nulo: pernas simultâneas.
 
-[b]5. Como esta ferramenta calcula[/b]
+[b]6. Como esta ferramenta calcula[/b]
 Cada cotação BASE/COTADA gera duas conversões dirigidas:
   BASE→COTADA à taxa bid   ;   COTADA→BASE à taxa 1/ask.
 bid do cross = taxa do percurso BASE→…→COTADA; ask = 1/(taxa COTADA→…→BASE).
@@ -113,7 +125,8 @@ class CrossRatesApp(App):
         ("q", "quit", "Sair"),
         ("a", "arbitragem", "Arbitragem"),
         ("e", "exemplos_cross", "Ex. cross"),
-        ("x", "exemplos_arbitragem", "Ex. arbitragem"),
+        ("x", "exemplos_arbitragem", "Ex. triangular"),
+        ("g", "exemplos_geografica", "Ex. geográfica"),
         ("l", "limpar", "Limpar"),
         ("t", "teoria", "Teoria"),
     ]
@@ -133,10 +146,12 @@ class CrossRatesApp(App):
 
                 yield Label("Adicionar cotação", classes="rotulo")
                 yield Static(
-                    "Formato BASE COTADA bid ask. A base está ao certo; bid ≤ ask.",
+                    "Formato BASE COTADA bid ask [fonte]. A base está ao certo; "
+                    "bid ≤ ask. A fonte (praça/banco) é opcional, p/ arbitragem "
+                    "geográfica.",
                     classes="dica",
                 )
-                yield Input(placeholder="ex.: EUR USD 1.0850 1.0852", id="add")
+                yield Input(placeholder="ex.: EUR USD 1.1574 1.1576 Paris", id="add")
 
                 yield Label("Calcular cross-rate", classes="rotulo")
                 yield Static(
@@ -147,10 +162,11 @@ class CrossRatesApp(App):
                 yield Input(placeholder="ex.: GBP SEK", id="calc")
                 yield Static("Introduza cotações e calcule um cross.", id="resultado")
 
-                yield Label("Arbitragem triangular  [tecla a]", classes="rotulo")
+                yield Label("Arbitragem (geográfica + triangular)  [tecla a]", classes="rotulo")
                 yield Static(
-                    "Procura ciclos de 3 moedas com fator > 1 (ganho certo). "
-                    "Indique um montante para ver o lucro e a simulação.",
+                    "Procura ganhos certos: mesmo par em praças diferentes e "
+                    "ciclos de 3 moedas (fator > 1). Indique um montante para "
+                    "ver o lucro e a simulação.",
                     classes="dica",
                 )
                 yield Input(
@@ -164,7 +180,7 @@ class CrossRatesApp(App):
 
     def on_mount(self) -> None:
         tabela = self.query_one("#tabela", DataTable)
-        tabela.add_columns("Par", "bid", "ask", "spread")
+        tabela.add_columns("Par", "bid", "ask", "spread", "fonte")
         tabela.cursor_type = "row"
 
     # --- ações de teclado --------------------------------------------------- #
@@ -183,7 +199,12 @@ class CrossRatesApp(App):
     def action_exemplos_arbitragem(self) -> None:
         for args in EXEMPLOS_ARBITRAGEM:
             self._adicionar_cotacao(Cotacao(*args))
-        self._info("Exemplos de arbitragem carregados (Ex. 17). Prima [a].")
+        self._info("Exemplos de arbitragem triangular carregados (Ex. 17). Prima [a].")
+
+    def action_exemplos_geografica(self) -> None:
+        for args in EXEMPLOS_GEOGRAFICA:
+            self._adicionar_cotacao(Cotacao(*args))
+        self._info("Exemplos de arbitragem geográfica carregados (Ex. 15). Prima [a].")
 
     def action_teoria(self) -> None:
         painel = self.query_one("#direita", VerticalScroll)
@@ -193,8 +214,9 @@ class CrossRatesApp(App):
         montante = self._le_montante()
         if montante is False:  # entrada inválida
             return
-        oportunidades = arbitragens_triangulares(self.grafo)
-        self._mostrar_arbitragem(oportunidades, montante)
+        geograficas = arbitragens_geograficas(self.grafo)
+        triangulares = arbitragens_triangulares(self.grafo)
+        self._mostrar_arbitragem(geograficas, triangulares, montante)
 
     # --- entradas ----------------------------------------------------------- #
 
@@ -250,7 +272,11 @@ class CrossRatesApp(App):
     def _adicionar_cotacao(self, cotacao: Cotacao) -> None:
         self.grafo.adicionar(cotacao)
         self.query_one("#tabela", DataTable).add_row(
-            cotacao.par, _fmt(cotacao.bid), _fmt(cotacao.ask), _fmt(cotacao.spread)
+            cotacao.par,
+            _fmt(cotacao.bid),
+            _fmt(cotacao.ask),
+            _fmt(cotacao.spread),
+            cotacao.fonte or "—",
         )
 
     def _mostrar_resultado(self, r) -> None:
@@ -265,36 +291,51 @@ class CrossRatesApp(App):
         self.query_one("#resultado", Static).update(texto)
 
     def _mostrar_arbitragem(
-        self, oportunidades: list[Arbitragem], montante
+        self,
+        geograficas: list[ArbitragemGeografica],
+        triangulares: list[Arbitragem],
+        montante,
     ) -> None:
         alvo = self.query_one("#arb", Static)
-        if not oportunidades:
+        if not geograficas and not triangulares:
             alvo.update(
-                "[b]Sem arbitragem triangular.[/b] Nenhum ciclo de 3 moedas tem "
-                "fator > 1: os preços são mutuamente consistentes (intervalos "
-                "implícito e direto sobrepõem-se)."
+                "[b]Sem arbitragem.[/b] Nenhum par em praças diferentes tem "
+                "ask < bid cruzado, e nenhum ciclo de 3 moedas tem fator > 1: "
+                "os preços são mutuamente consistentes."
             )
             return
 
-        linhas = [f"[b]{len(oportunidades)} oportunidade(s) de arbitragem:[/b]\n"]
-        for i, arb in enumerate(oportunidades, 1):
-            linhas.append(
-                f"[b]{i}. {arb.ciclo_texto}[/b]  — fator {_fmt(arb.fator, 6)}  "
-                f"([green]+{_fmt(arb.ganho_pct, 4)}%[/green])"
-            )
-            for passo in arb.passos:
+        linhas: list[str] = []
+        if geograficas:
+            linhas.append("[b u]Arbitragem geográfica[/b u]")
+            for i, arb in enumerate(geograficas, 1):
                 linhas.append(
-                    f"    {passo.descricao} @ {_fmt(passo.taxa, 6)}"
+                    f"[b]{i}. {arb.par}[/b]  comprar em {arb.fonte_compra} @ ask "
+                    f"{_fmt(arb.ask_compra)} → vender em {arb.fonte_venda} @ bid "
+                    f"{_fmt(arb.bid_venda)}  ([green]+{_fmt(arb.ganho_pct, 4)}%[/green])"
                 )
-            if montante:
-                sim = arb.simulacao(montante)
-                cadeia = "  ".join(f"{_fmt(v, 2)} {m}" for m, v in sim)
-                lucro = arb.lucro(montante)
-                linhas.append(f"    {cadeia}")
+                if montante:
+                    for passo in arb.simulacao(montante):
+                        linhas.append(f"    {passo}")
+            linhas.append("")
+
+        if triangulares:
+            linhas.append("[b u]Arbitragem triangular[/b u]")
+            for i, arb in enumerate(triangulares, 1):
                 linhas.append(
-                    f"    [b green]lucro ≈ +{_fmt(lucro, 2)} "
-                    f"{arb.ciclo[0]}[/b green]"
+                    f"[b]{i}. {arb.ciclo_texto}[/b]  — fator {_fmt(arb.fator, 6)}  "
+                    f"([green]+{_fmt(arb.ganho_pct, 4)}%[/green])"
                 )
+                for passo in arb.passos:
+                    linhas.append(f"    {passo.descricao} @ {_fmt(passo.taxa, 6)}")
+                if montante:
+                    sim = arb.simulacao(montante)
+                    cadeia = "  ".join(f"{_fmt(v, 2)} {m}" for m, v in sim)
+                    linhas.append(f"    {cadeia}")
+                    linhas.append(
+                        f"    [b green]lucro ≈ +{_fmt(arb.lucro(montante), 2)} "
+                        f"{arb.ciclo[0]}[/b green]"
+                    )
             linhas.append("")
         alvo.update("\n".join(linhas).rstrip())
 

@@ -2,13 +2,18 @@
 
 from decimal import Decimal
 
-from cross_rates.nucleo import Cotacao, GrafoCambial, arbitragens_triangulares
+from cross_rates.nucleo import (
+    Cotacao,
+    GrafoCambial,
+    arbitragens_geograficas,
+    arbitragens_triangulares,
+)
 
 
 def grafo_de(*cotacoes):
     g = GrafoCambial()
-    for base, cotada, bid, ask in cotacoes:
-        g.adicionar(Cotacao(base, cotada, bid, ask))
+    for partes in cotacoes:
+        g.adicionar(Cotacao(*partes))
     return g
 
 
@@ -60,6 +65,54 @@ def test_limiar_filtra_ganhos_pequenos():
     )
     # ganho ~0,157%; um limiar de 1% deve filtrá-lo.
     assert arbitragens_triangulares(g, limiar=Decimal("0.01")) == []
+
+
+def test_ex15_arbitragem_geografica_eur_usd():
+    # Banque P (Paris) vs L Bank (Londres): ask Paris < bid Londres -> arbitragem.
+    g = grafo_de(
+        ("EUR", "USD", "1.1574", "1.1576", "Paris"),
+        ("EUR", "USD", "1.1583", "1.1585", "Londres"),
+    )
+    ops = arbitragens_geograficas(g)
+    assert len(ops) == 1
+    arb = ops[0]
+    assert arb.fonte_compra == "Paris"  # compra a base onde o ask é menor
+    assert arb.fonte_venda == "Londres"  # vende onde o bid é maior
+    # 4.750.000 USD -> ~4.103.317,9 EUR; lucro ~2.872 USD (caderno).
+    eur = Decimal("4750000") / arb.ask_compra
+    assert abs(arb.lucro(eur) - Decimal("2872")) < Decimal("5")
+
+
+def test_ex16_arbitragem_geografica_usd_hkd():
+    # GBbank vs HKbank: bid GBbank > ask HKbank -> compra no HKbank, vende GBbank.
+    g = grafo_de(
+        ("USD", "HKD", "7.8157", "7.8178", "GBbank"),
+        ("USD", "HKD", "7.8128", "7.8146", "HKbank"),
+    )
+    arb = arbitragens_geograficas(g)[0]
+    assert arb.fonte_compra == "HKbank"
+    assert arb.fonte_venda == "GBbank"
+    # 750.000 USD -> lucro 825 HKD (caderno).
+    assert arb.lucro(750_000) == Decimal("825.0000")
+
+
+def test_sem_arbitragem_geografica_quando_sobrepoe():
+    g = grafo_de(
+        ("EUR", "USD", "1.1574", "1.1578", "A"),
+        ("EUR", "USD", "1.1575", "1.1579", "B"),  # intervalos sobrepõem-se
+    )
+    assert arbitragens_geograficas(g) == []
+
+
+def test_arbitragem_geografica_deteta_orientacao_inversa():
+    # Mesmo par cotado nas duas orientações (EUR/USD vs USD/EUR) é reconhecido.
+    g = grafo_de(
+        ("EUR", "USD", "1.1574", "1.1576", "Paris"),
+        ("USD", "EUR", "0.86319", "0.86327", "Londres"),  # ~ 1.1583–1.1585
+    )
+    ops = arbitragens_geograficas(g)
+    assert len(ops) == 1
+    assert ops[0].fonte_compra == "Paris"
 
 
 def test_simulacao_perna_a_perna():

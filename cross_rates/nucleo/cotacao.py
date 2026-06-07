@@ -47,6 +47,7 @@ class Cotacao:
     cotada: str
     bid: Decimal
     ask: Decimal
+    fonte: str = ""  # praça/banco de origem (p/ arbitragem geográfica)
 
     def __post_init__(self) -> None:
         # dataclass frozen: usa-se object.__setattr__ para normalizar os campos.
@@ -54,6 +55,7 @@ class Cotacao:
         object.__setattr__(self, "cotada", normaliza_moeda(self.cotada))
         object.__setattr__(self, "bid", _para_decimal(self.bid))
         object.__setattr__(self, "ask", _para_decimal(self.ask))
+        object.__setattr__(self, "fonte", str(self.fonte).strip())
 
         if self.base == self.cotada:
             raise CotacaoInvalida("A base e a cotada não podem ser a mesma moeda.")
@@ -75,14 +77,19 @@ class Cotacao:
 
     @classmethod
     def de_texto(cls, texto: str) -> "Cotacao":
-        """Cria uma cotação a partir de ``"EUR USD 1.0850 1.0852"``."""
+        """Cria uma cotação a partir de ``"EUR USD 1.0850 1.0852 [fonte]"``.
+
+        A fonte (praça/banco) é opcional e pode ter espaços (vem após o ask).
+        """
         partes = texto.replace(",", ".").split()
-        if len(partes) != 4:
+        if len(partes) < 4:
             raise CotacaoInvalida(
-                "Formato esperado: BASE COTADA bid ask (ex.: EUR USD 1.0850 1.0852)."
+                "Formato esperado: BASE COTADA bid ask [fonte] "
+                "(ex.: EUR USD 1.0850 1.0852 Paris)."
             )
-        base, cotada, bid, ask = partes
-        return cls(base=base, cotada=cotada, bid=bid, ask=ask)
+        base, cotada, bid, ask = partes[:4]
+        fonte = " ".join(partes[4:])
+        return cls(base=base, cotada=cotada, bid=bid, ask=ask, fonte=fonte)
 
     def __str__(self) -> str:
         return f"{self.par} = {self.bid} – {self.ask}"

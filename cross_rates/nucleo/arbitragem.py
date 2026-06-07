@@ -17,9 +17,11 @@ mas expressa de uma só forma que dispensa decorar regras.
 from __future__ import annotations
 
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
+from .cotacao import Cotacao
 from .grafo import GrafoCambial
 
 
@@ -110,5 +112,109 @@ def arbitragens_triangulares(
             arb = _ciclo(grafo, ordem)
             if arb is not None and arb.fator > minimo:
                 oportunidades.append(arb)
+    oportunidades.sort(key=lambda x: x.fator, reverse=True)
+    return oportunidades
+
+
+# --------------------------------------------------------------------------- #
+# Arbitragem geográfica (espacial)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class ArbitragemGeografica:
+    """Mesmo par cotado em duas praças: compra-se barato e vende-se caro.
+
+    Existe se o ``ask`` mais baixo (onde se compra a base) for inferior ao
+    ``bid`` mais alto (onde se vende a base), em praças diferentes.
+    O ganho realiza-se na moeda cotada.
+    """
+
+    base: str
+    cotada: str
+    fonte_compra: str
+    ask_compra: Decimal
+    fonte_venda: str
+    bid_venda: Decimal
+
+    @property
+    def par(self) -> str:
+        return f"{self.base}/{self.cotada}"
+
+    @property
+    def margem(self) -> Decimal:
+        """Margem por unidade da base (em moeda cotada)."""
+        return self.bid_venda - self.ask_compra
+
+    @property
+    def fator(self) -> Decimal:
+        return self.bid_venda / self.ask_compra
+
+    @property
+    def ganho_pct(self) -> Decimal:
+        return (self.fator - Decimal(1)) * Decimal(100)
+
+    def lucro(self, montante_base) -> Decimal:
+        """Lucro (em moeda cotada) ao arbitrar ``montante_base`` da base."""
+        return Decimal(str(montante_base)) * self.margem
+
+    def simulacao(self, montante_base) -> list[str]:
+        m = Decimal(str(montante_base))
+        paga = m * self.ask_compra
+        recebe = m * self.bid_venda
+        return [
+            f"compra {m} {self.base} em {self.fonte_compra} @ ask "
+            f"{self.ask_compra} → paga {paga} {self.cotada}",
+            f"vende {m} {self.base} em {self.fonte_venda} @ bid "
+            f"{self.bid_venda} → recebe {recebe} {self.cotada}",
+            f"lucro = {recebe - paga} {self.cotada}",
+        ]
+
+
+def _orienta(c: Cotacao, base: str, cotada: str) -> tuple[Decimal, Decimal]:
+    """Devolve (bid, ask) de ``c`` expressos na orientação ``base/cotada``."""
+    if c.base == base and c.cotada == cotada:
+        return c.bid, c.ask
+    # cotação inversa: bid' = 1/ask, ask' = 1/bid
+    return Decimal(1) / c.ask, Decimal(1) / c.bid
+
+
+def arbitragens_geograficas(
+    grafo: GrafoCambial, limiar: Decimal = Decimal("0")
+) -> list[ArbitragemGeografica]:
+    """Lista arbitragens geográficas (mesmo par em praças diferentes).
+
+    Para cada par, encontra o ``ask`` mais baixo (compra) e o ``bid`` mais alto
+    (venda); há arbitragem se ``bid_venda > ask_compra × (1 + limiar)``.
+    """
+    # Agrupa cotações por par não ordenado (junta orientações diretas e inversas).
+    grupos: dict[frozenset[str], list[Cotacao]] = defaultdict(list)
+    for c in grafo.cotacoes:
+        grupos[frozenset((c.base, c.cotada))].append(c)
+
+    oportunidades: list[ArbitragemGeografica] = []
+    minimo = Decimal(1) + limiar
+    for membros in grupos.values():
+        if len(membros) < 2:
+            continue
+        # orientação canónica = a da primeira cotação do grupo
+        base, cotada = membros[0].base, membros[0].cotada
+        compra = None  # (fonte, ask) mais baixo
+        venda = None  # (fonte, bid) mais alto
+        for i, c in enumerate(membros):
+            bid, ask = _orienta(c, base, cotada)
+            fonte = c.fonte or f"praça {i + 1}"
+            if compra is None or ask < compra[1]:
+                compra = (fonte, ask)
+            if venda is None or bid > venda[1]:
+                venda = (fonte, bid)
+        if compra is None or venda is None:
+            continue
+        if venda[1] > compra[1] * minimo and compra[0] != venda[0]:
+            oportunidades.append(
+                ArbitragemGeografica(
+                    base, cotada, compra[0], compra[1], venda[0], venda[1]
+                )
+            )
     oportunidades.sort(key=lambda x: x.fator, reverse=True)
     return oportunidades
