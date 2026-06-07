@@ -9,7 +9,7 @@ from cross_rates.tui import CrossRatesApp
 async def test_fluxo_adicionar_e_calcular():
     app = CrossRatesApp()
     async with app.run_test() as pilot:
-        app.action_exemplos()  # carrega Ex. 12
+        app.action_exemplos_cross()  # carrega Ex. 12
         await pilot.pause()
         assert len(app.grafo.cotacoes) == 3
 
@@ -27,3 +27,17 @@ async def test_fluxo_adicionar_e_calcular():
         conteudo = str(app.query_one("#resultado").render())
         assert _fmt(r.bid) in conteudo
         assert "direto" in conteudo
+
+
+@pytest.mark.asyncio
+async def test_arbitragem_na_tui():
+    app = CrossRatesApp()
+    async with app.run_test() as pilot:
+        app.action_exemplos_arbitragem()  # Ex. 17 (tem arbitragem)
+        await pilot.pause()
+        app.query_one("#montante").value = "2500000"
+        app.action_arbitragem()
+        await pilot.pause()
+        conteudo = str(app.query_one("#arb").render())
+        assert "arbitragem" in conteudo.lower()
+        assert "lucro" in conteudo.lower()

@@ -24,10 +24,17 @@ Na TUI:
 
 1. **Adicionar cotação** — escreva `BASE COTADA bid ask`, ex.: `EUR USD 1.0850 1.0852`.
 2. **Calcular cross** — escreva `BASE COTADA`, ex.: `GBP SEK`.
-3. Atalhos: `e` carrega cotações de exemplo, `l` limpa a tabela, `q` sai.
+3. **Arbitragem triangular** — tecla `a` (opcionalmente com um montante).
+4. Atalhos: `e` exemplos de cross, `x` exemplos de arbitragem, `t` painel de
+   teoria, `l` limpa a tabela, `q` sai.
 
-O resultado mostra `bid – ask`, o `spread`, o **tipo** (direta / cross direto ÷
-/ cross indireto ×) e o **percurso** de moedas usado.
+O resultado do cross mostra `bid – ask`, `spread`, **tipo** (direta / inversa /
+cross direto ÷ / cross indireto ×), o **percurso**, as **fórmulas** bid/ask com
+as pontas certas e uma **nota metodológica**. Um **painel de teoria** (tecla `t`)
+resume a convenção, a regra do bid/ask e as regras de cross e arbitragem.
+
+A arbitragem lista os ciclos de 3 moedas com **fator > 1** (ganho certo),
+detalhando cada perna e, se indicar um montante, o **lucro** e a **simulação**.
 
 ## Convenção
 
@@ -60,15 +67,18 @@ produto de taxas seja `> 1`).
 
 ```
 cross_rates/
-  nucleo/        # lógica cambial pura, sem interface (100% testável)
-    cotacao.py   # Cotacao: par, bid, ask (+ validação)
-    grafo.py     # GrafoCambial: moedas (nós) e conversões (arestas)
-    cross.py     # cross(): deriva o cross-rate + percurso + tipo
+  nucleo/           # lógica cambial pura, sem interface (100% testável)
+    cotacao.py      # Cotacao: par, bid, ask (+ validação)
+    grafo.py        # GrafoCambial: moedas (nós) e conversões (arestas)
+    cross.py        # cross(): cross-rate + percurso + tipo + fórmulas + nota
+    arbitragem.py   # arbitragens_triangulares(): ciclos com fator > 1
   tui/
-    app.py       # interface Textual
-  __main__.py    # python -m cross_rates
+    app.py          # interface Textual (cross, arbitragem, teoria)
+  __main__.py       # python -m cross_rates
 testes/
-  test_cross.py  # trancado às resoluções do Caderno de Exercícios nº 1
+  test_cross.py     # trancado às resoluções do Caderno (Ex. 10/11/12/17)
+  test_arbitragem.py# trancado a Ex. 17/18
+  test_tui.py       # fluxo headless da interface
 ```
 
 ## Testes
@@ -80,12 +90,23 @@ pytest
 Os testes do cross-rate reproduzem exercícios resolvidos (Ex. 10, 11, 12, 17),
 validando em simultâneo a matemática e a convenção bid/ask.
 
+## Arbitragem triangular
+
+Uma arbitragem é um **ciclo de 3 moedas** `A→B→C→A` cujo produto das taxas
+(cada uma já na ponta bid/ask correta) é **> 1**:
+
+    fator > 1  ⇒  ganho certo = (fator − 1) × montante inicial
+
+É a forma unificada da regra do caderno "cross implícito ≠ cotação direta".
+Risco nulo, porque as pernas são simultâneas. Ver `arbitragens_triangulares()`.
+
 ## Roteiro (próximas fases)
 
 Tudo assenta no mesmo `GrafoCambial`:
 
-- **Arbitragem geográfica** — mesmo par cotado em praças diferentes (Ex. 15–16).
-- **Arbitragem triangular** — cross implícito vs. cotado (Ex. 17–18).
+- ~~**Arbitragem triangular** — cross implícito vs. cotado (Ex. 17–18).~~ ✅ feito.
+- **Arbitragem geográfica** — mesmo par em praças diferentes (Ex. 15–16);
+  requer arestas multi-fonte no grafo.
 - **Forwards / PTJ** — taxas a prazo com bid/ask (Ex. 21–29).
 - **Swaps cambiais** — spot + forward de sinais opostos (Ex. 30).
 - **Feeds em tempo real** — fonte de preços conectável (broker/exchange).

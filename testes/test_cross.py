@@ -127,6 +127,30 @@ def test_ex17_gbp_eur_implicito_via_jpy():
     assert proximo(r.ask, "1.1583")
 
 
+def test_formulas_batem_com_o_caderno():
+    # Ex. 12 direto (÷) e Ex. 11 indireto (×): fórmulas explícitas com pontas.
+    g = grafo_de(
+        ("GBP", "CAD", "1.8091", "1.8096"),
+        ("CHF", "CAD", "1.7029", "1.7035"),
+    )
+    r = cross(g, "GBP", "CHF")
+    assert r.bid_formula == "bid = bid(GBP/CAD) ÷ ask(CHF/CAD)"
+    assert r.ask_formula == "ask = ask(GBP/CAD) ÷ bid(CHF/CAD)"
+
+    g2 = grafo_de(
+        ("USD", "BRL", "5.2381", "5.2419"),
+        ("GBP", "USD", "1.3358", "1.3361"),
+    )
+    r2 = cross(g2, "GBP", "BRL")
+    assert r2.bid_formula == "bid = bid(GBP/USD) × bid(USD/BRL)"
+    assert r2.ask_formula == "ask = ask(GBP/USD) × ask(USD/BRL)"
+
+
+def test_classifica_inversa():
+    g = grafo_de(("EUR", "USD", "1.0850", "1.0852"))
+    assert cross(g, "USD", "EUR").tipo == "inversa"
+
+
 def test_cotacao_direta_passa_intacta():
     g = grafo_de(("EUR", "USD", "1.0850", "1.0852"))
     r = cross(g, "EUR", "USD")
