@@ -22,6 +22,9 @@ from .forward import (
 )
 from .grafo import GrafoCambial, SemPercurso
 
+from .swaps import SwapOutright, outright_de_pontos
+from .hedging import AnaliseHedging, analisa_hedging
+
 __all__ = [
     "Cotacao",
     "CotacaoInvalida",
@@ -40,4 +43,8 @@ __all__ = [
     "ArbitragemPrazo",
     "forward",
     "arbitragem_a_prazo",
+    "SwapOutright",
+    "outright_de_pontos",
+    "AnaliseHedging",
+    "analisa_hedging",
 ]

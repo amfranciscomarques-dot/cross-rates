@@ -15,7 +15,9 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from cross_rates.tui.pratica import PraticaScreen
+from textual.containers import Horizontal, VerticalScroll, Vertical
+from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 
 from cross_rates.nucleo import (
@@ -32,6 +34,8 @@ from cross_rates.nucleo import (
     cross,
     forward,
     normaliza_moeda,
+    outright_de_pontos,
+    analisa_hedging,
 )
 
 # Exemplos do caderno para arranque rápido.
@@ -72,16 +76,29 @@ O preço diz quantas unidades de B valem 1 A. Mostra-se [b]bid – ask[/b], bid 
 Spread = ask − bid (a margem do banco).
 
 [b]3. Cross-rate (taxa cruzada)[/b]
-Câmbio entre duas moedas sem cotação direta, via uma moeda-veículo.
+Câmbio entre duas moedas sem cotação direta, via uma moeda-veículo C.
 Em cada conversão aplica-se a ponta [b]desfavorável[/b] ao cliente — passar por
 uma moeda intermédia nunca contorna a margem.
 
-  [b]Cross direto (÷)[/b] — moeda comum do mesmo lado nos dois pares:
-     bid = bid(X/C) ÷ ask(Y/C)   ;   ask = ask(X/C) ÷ bid(Y/C)
-  [b]Cross indireto (×)[/b] — moeda comum em lados opostos:
-     bid = bid(C/X) × bid(C/Y)   ;   ask = ask(C/X) × ask(C/Y)
+  [b]Ótica dos fluxos (compra/venda)[/b] — para achar X/Y, parte de [b]1 X[/b] e
+  segue a cadeia de trocas [b]X → C → Y[/b]. Em cada perna, vê o que tens nesse
+  par e o que queres obter:
+     • tens a BASE e queres a COTADA  → [b]× taxa[/b]  (vendes a base, recebes cotada)
+     • tens a COTADA e queres a BASE  → [b]÷ taxa[/b]  (gastas cotada p/ comprar base)
+  O "direto/indireto" é apenas o efeito líquido destas duas pernas — depende de
+  que lado a moeda comum C ocupa (ao certo/ao incerto) em cada par:
 
-Identificar onde está a moeda comum (ao certo/ao incerto) é o passo decisivo.
+  [b]Cross direto (÷)[/b] — C do [b]mesmo lado[/b] nos dois pares (ex.: X/C e Y/C):
+     X →[× X/C]→ C →[÷ Y/C]→ Y   ⇒   X/Y = (X/C) ÷ (Y/C)
+     bid = bid(X/C) ÷ ask(Y/C)   ;   ask = ask(X/C) ÷ bid(Y/C)
+  [b]Cross indireto (×)[/b] — C em [b]lados opostos[/b] (ex.: X/C e C/Y):
+     X →[× X/C]→ C →[× C/Y]→ Y   ⇒   X/Y = (X/C) × (C/Y)
+     bid = bid(X/C) × bid(C/Y)   ;   ask = ask(X/C) × ask(C/Y)
+
+  [b]Porquê estas pontas no bid/ask[/b]: o [b]bid[/b] do cross é o percurso em que
+  o cliente [b]vende X[/b] (acaba com Y); o [b]ask[/b] é o inverso, [b]compra X[/b].
+  Em cada perna do fluxo usa-se sempre a ponta pior p/ o cliente — vende ao bid,
+  compra ao ask — por isso o bid e o ask do cross misturam bids e asks dos pares.
 
 [b]4. Arbitragem geográfica (espacial)[/b]
 Mesmo par cotado em praças diferentes. Há ganho certo se o [b]ask mais baixo[/b]
@@ -120,6 +137,30 @@ def _fmt(valor: Decimal, casas: int | None = None) -> str:
     return f"{valor.normalize():f}"
 
 
+class PedeFicheiroModal(ModalScreen[str]):
+    """Modal para pedir o nome do ficheiro para salvar/abrir cenário."""
+    
+    def __init__(self, titulo: str) -> None:
+        super().__init__()
+        self.titulo = titulo
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal_dialog"):
+            yield Label(self.titulo, classes="rotulo")
+            yield Input(placeholder="ex.: exame_2023.txt", id="ficheiro_input")
+            yield Label("Pressione Enter para confirmar, Esc para cancelar", classes="dica")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip())
+
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            self.dismiss("")
+
+
 class CrossRatesApp(App):
     """Calculadora de cross-rates e arbitragem triangular, com bid/ask."""
 
@@ -128,7 +169,7 @@ class CrossRatesApp(App):
     #corpo { height: 1fr; }
     #esquerda { width: 3fr; padding: 0 1; }
     #direita { width: 2fr; padding: 0 1; border-left: solid $accent; }
-    #resultado, #arb, #forward_res {
+    #resultado, #arb, #forward_res, #swap_res, #hedge_res {
         height: auto; padding: 1; border: round $accent; margin: 1 0;
     }
     #teoria { padding: 1; }
@@ -137,15 +178,26 @@ class CrossRatesApp(App):
     .dica { color: $text-muted; }
     Input { margin: 0 0 1 0; }
     DataTable { height: auto; }
+    #modal_dialog {
+        width: 60;
+        height: auto;
+        padding: 2;
+        background: $surface;
+        border: thick $primary;
+        align: center middle;
+    }
     """
     BINDINGS = [
         ("q", "quit", "Sair"),
+        ("p", "pratica", "Prática"),
         ("a", "arbitragem", "Arbitragem"),
         ("e", "exemplos_cross", "Ex. cross"),
         ("x", "exemplos_arbitragem", "Ex. triangular"),
         ("g", "exemplos_geografica", "Ex. geográfica"),
         ("f", "exemplos_forward", "Ex. forward"),
         ("l", "limpar", "Limpar"),
+        ("s", "salvar_cenario", "Salvar Cenário"),
+        ("o", "abrir_cenario", "Abrir Cenário"),
         ("t", "teoria", "Teoria"),
     ]
 
@@ -206,6 +258,25 @@ class CrossRatesApp(App):
                     id="forward",
                 )
                 yield Static("Sem cálculo de forward ainda.", id="forward_res")
+
+                yield Label("Swaps (Pontos Forward)", classes="rotulo")
+                yield Static(
+                    "BASE COTADA pontos_bid pontos_ask [casas_decimais]. "
+                    "O spot tem de estar na tabela. Padrão: 4 casas decimais.",
+                    classes="dica",
+                )
+                yield Input(placeholder="ex.: EUR USD 20 30", id="swap")
+                yield Static("Sem cálculo de swap ainda.", id="swap_res")
+
+                yield Label("Hedging (Cobertura de Risco)", classes="rotulo")
+                yield Static(
+                    "TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a). "
+                    "TIPO = recebimento | pagamento. "
+                    "A Moeda Estrangeira será sempre a COTADA.",
+                    classes="dica",
+                )
+                yield Input(placeholder="ex.: pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6", id="hedge")
+                yield Static("Sem análise de hedging ainda.", id="hedge_res")
             with VerticalScroll(id="direita"):
                 yield Static(TEORIA, id="teoria")
         yield Footer()
@@ -247,6 +318,9 @@ class CrossRatesApp(App):
             "campo de forward (tem arbitragem a prazo)."
         )
 
+    def action_pratica(self) -> None:
+        self.push_screen(PraticaScreen())
+
     def action_teoria(self) -> None:
         painel = self.query_one("#direita", VerticalScroll)
         painel.display = not painel.display
@@ -258,6 +332,45 @@ class CrossRatesApp(App):
         geograficas = arbitragens_geograficas(self.grafo)
         triangulares = arbitragens_triangulares(self.grafo)
         self._mostrar_arbitragem(geograficas, triangulares, montante)
+
+    def action_salvar_cenario(self) -> None:
+        def callback(ficheiro: str) -> None:
+            if not ficheiro:
+                return
+            try:
+                with open(ficheiro, "w", encoding="utf-8") as f:
+                    for c in self.grafo.cotacoes:
+                        fonte = c.fonte if c.fonte else ""
+                        linha = f"{c.base} {c.cotada} {c.bid} {c.ask} {fonte}".strip()
+                        f.write(linha + "\n")
+                self._info(f"Cenário salvo em: {ficheiro}")
+            except Exception as e:
+                self._erro(f"Falha ao salvar cenário: {e}")
+
+        self.push_screen(PedeFicheiroModal("Nome do ficheiro para salvar:"), callback)
+
+    def action_abrir_cenario(self) -> None:
+        def callback(ficheiro: str) -> None:
+            if not ficheiro:
+                return
+            try:
+                novas_cotacoes = []
+                with open(ficheiro, "r", encoding="utf-8") as f:
+                    for linha in f:
+                        linha = linha.strip()
+                        if linha and not linha.startswith("#"):
+                            novas_cotacoes.append(Cotacao.de_texto(linha))
+                
+                self.action_limpar()
+                for c in novas_cotacoes:
+                    self._adicionar_cotacao(c)
+                self._info(f"Cenário aberto: {ficheiro}")
+            except FileNotFoundError:
+                self._erro(f"Ficheiro não encontrado: {ficheiro}")
+            except Exception as e:
+                self._erro(f"Falha ao abrir cenário: {e}")
+
+        self.push_screen(PedeFicheiroModal("Nome do ficheiro para abrir:"), callback)
 
     # --- entradas ----------------------------------------------------------- #
 
@@ -271,6 +384,10 @@ class CrossRatesApp(App):
             self.action_arbitragem()
         elif evento.input.id == "forward" and texto:
             self._tratar_forward(texto)
+        elif evento.input.id == "swap" and texto:
+            self._tratar_swap(texto)
+        elif evento.input.id == "hedge" and texto:
+            self._tratar_hedge(texto)
 
     def _tratar_adicao(self, texto: str, campo: Input) -> None:
         try:
@@ -324,6 +441,64 @@ class CrossRatesApp(App):
             self._erro_forward(str(exc))
             return
         self._mostrar_forward(r, arb)
+
+    def _tratar_swap(self, texto: str) -> None:
+        partes = texto.replace(",", ".").split()
+        if len(partes) not in (4, 5):
+            self._erro_swap("Formato: BASE COTADA pontos_bid pontos_ask [casas_decimais].")
+            return
+        base, cotada = partes[0], partes[1]
+        spot = self._spot_para(base, cotada)
+        if spot is None:
+            self._erro_swap(f"Sem spot {base.upper()}/{cotada.upper()} na tabela.")
+            return
+        
+        casas = 4
+        if len(partes) == 5:
+            try:
+                casas = int(partes[4])
+            except ValueError:
+                self._erro_swap("As casas decimais devem ser um número inteiro (ex: 4).")
+                return
+
+        try:
+            r = outright_de_pontos(spot, partes[2], partes[3], casas_decimais_pontos=casas)
+        except CotacaoInvalida as exc:
+            self._erro_swap(str(exc))
+            return
+            
+        self._mostrar_swap(r)
+
+    def _tratar_hedge(self, texto: str) -> None:
+        partes = texto.replace(",", ".").split()
+        if len(partes) != 9:
+            self._erro_hedge(
+                "Formato: TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a)."
+            )
+            return
+            
+        tipo = partes[0].lower()
+        if tipo not in ("recebimento", "pagamento"):
+            self._erro_hedge("TIPO deve ser 'recebimento' ou 'pagamento'.")
+            return
+            
+        montante = partes[1]
+        base, cotada, dias = partes[2], partes[3], partes[4]
+        spot = self._spot_para(base, cotada)
+        if spot is None:
+            self._erro_hedge(f"Sem spot {base.upper()}/{cotada.upper()} na tabela.")
+            return
+
+        try:
+            n = int(dias)
+            juro_base = TaxaJuro(base, partes[5], partes[6])
+            juro_cotada = TaxaJuro(cotada, partes[7], partes[8])
+            r = analisa_hedging(tipo, montante, spot, juro_base, juro_cotada, n)
+        except (CotacaoInvalida, ValueError) as exc:
+            self._erro_hedge(str(exc))
+            return
+            
+        self._mostrar_hedge(r)
 
     def _spot_para(self, base: str, cotada: str) -> Cotacao | None:
         """Spot ``base/cotada`` a partir da tabela (invertendo se necessário)."""
@@ -462,8 +637,44 @@ class CrossRatesApp(App):
             )
         self.query_one("#forward_res", Static).update("\n".join(linhas))
 
+    def _mostrar_swap(self, r) -> None:
+        linhas = [
+            f"[b]{r.par}[/b] outright (via swap) = [green]{_fmt(r.fwd_bid, r.casas_decimais_pontos)}[/green] – "
+            f"[red]{_fmt(r.fwd_ask, r.casas_decimais_pontos)}[/red]",
+            f"[b]spot:[/b] {_fmt(r.spot_bid)} – {_fmt(r.spot_ask)}    "
+            f"[b]pontos:[/b] {_fmt(r.pontos_bid)} / {_fmt(r.pontos_ask)}    "
+            f"[b]base a {r.sinal}[/b]",
+            f"  {r.forward_formula_bid}",
+            f"  {r.forward_formula_ask}",
+        ]
+        self.query_one("#swap_res", Static).update("\n".join(linhas))
+
+    def _mostrar_hedge(self, r) -> None:
+        acao = "Custo" if r.tipo_exposicao == "pagamento" else "Receita"
+        linhas = [
+            f"[b]Hedging de {r.tipo_exposicao}:[/b] {_fmt(r.montante_me)} {r.moeda_estrangeira} a {r.dias} dias",
+            "",
+            f"[b u]Forward Hedge[/b u]",
+            f"  Taxa forward aplicada: {_fmt(r.fwd_taxa, 6)}",
+            f"  {acao} total: [green]{_fmt(r.fwd_resultado_base, 2)} {r.moeda_base}[/green]",
+            "",
+            f"[b u]Money Market Hedge[/b u]",
+            f"  1. Valor presente em {r.moeda_estrangeira}: {_fmt(r.mmh_me_presente, 2)} (taxa juro: {_fmt(r.mmh_taxa_juro_base, 4)}%)",
+            f"  2. Conversão spot ({_fmt(r.mmh_spot_taxa, 6)}): {_fmt(r.mmh_base_presente, 2)} {r.moeda_base}",
+            f"  3. Valor futuro: [green]{_fmt(r.mmh_resultado_base, 2)} {r.moeda_base}[/green]",
+            "",
+            f"[b]Melhor estratégia:[/b] [bold magenta]{r.melhor_estrategia}[/bold magenta]",
+        ]
+        self.query_one("#hedge_res", Static).update("\n".join(linhas))
+
     def _erro_forward(self, msg: str) -> None:
         self.query_one("#forward_res", Static).update(f"[b red]Erro:[/b red] {msg}")
+
+    def _erro_swap(self, msg: str) -> None:
+        self.query_one("#swap_res", Static).update(f"[b red]Erro:[/b red] {msg}")
+
+    def _erro_hedge(self, msg: str) -> None:
+        self.query_one("#hedge_res", Static).update(f"[b red]Erro:[/b red] {msg}")
 
     def _info(self, msg: str) -> None:
         self.query_one("#resultado", Static).update(msg)
