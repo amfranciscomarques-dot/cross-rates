@@ -94,7 +94,7 @@ def _formulas(grafo: GrafoCambial, percurso: list[str]) -> tuple[str, str]:
     """
     numerador: list[str] = []  # pares onde se *vende* a base (multiplicam)
     denominador: list[str] = []  # pares onde se *compra* a base (dividem)
-    for de, para in zip(percurso, percurso[1:]):
+    for de, para in zip(percurso, percurso[1:], strict=False):
         c = grafo.cotacao_do_par(de, para)
         par = c.par if c is not None else f"{de}/{para}"
         if c is not None and c.base == de:  # vende-se a base 'de'

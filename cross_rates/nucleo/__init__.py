@@ -15,15 +15,16 @@ from .cotacao import Cotacao, CotacaoInvalida, normaliza_moeda
 from .cross import ResultadoCross, cross
 from .forward import (
     ArbitragemPrazo,
+    ConvencaoDia,
     ResultadoForward,
     TaxaJuro,
     arbitragem_a_prazo,
+    convencao_por_omissao_moeda,
     forward,
 )
 from .grafo import GrafoCambial, SemPercurso
-
-from .swaps import SwapOutright, outright_de_pontos
 from .hedging import AnaliseHedging, analisa_hedging
+from .swaps import SwapOutright, outright_de_pontos
 
 __all__ = [
     "Cotacao",
@@ -41,6 +42,8 @@ __all__ = [
     "TaxaJuro",
     "ResultadoForward",
     "ArbitragemPrazo",
+    "ConvencaoDia",
+    "convencao_por_omissao_moeda",
     "forward",
     "arbitragem_a_prazo",
     "SwapOutright",

@@ -16,6 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
+# Entrada numérica tolerante: aceita-se Decimal, int, float ou texto (ex.: a
+# cotação "1.0850"). É sempre normalizada para Decimal via ``_para_decimal``.
+Numerico = Decimal | int | float | str
+
 
 class CotacaoInvalida(ValueError):
     """Erro de validação de uma cotação cambial."""
@@ -31,7 +35,7 @@ def normaliza_moeda(codigo: str) -> str:
     return c
 
 
-def _para_decimal(valor) -> Decimal:
+def _para_decimal(valor: Numerico) -> Decimal:
     try:
         # passar por str evita o ruído binário do float (1.0852 != 1.0852000001).
         return Decimal(str(valor))
@@ -76,7 +80,7 @@ class Cotacao:
         return self.ask - self.bid
 
     @classmethod
-    def de_texto(cls, texto: str) -> "Cotacao":
+    def de_texto(cls, texto: str) -> Cotacao:
         """Cria uma cotação a partir de ``"EUR USD 1.0850 1.0852 [fonte]"``.
 
         A fonte (praça/banco) é opcional e pode ter espaços (vem após o ask).
@@ -89,7 +93,13 @@ class Cotacao:
             )
         base, cotada, bid, ask = partes[:4]
         fonte = " ".join(partes[4:])
-        return cls(base=base, cotada=cotada, bid=bid, ask=ask, fonte=fonte)
+        return cls(
+            base=base,
+            cotada=cotada,
+            bid=_para_decimal(bid),
+            ask=_para_decimal(ask),
+            fonte=fonte,
+        )
 
     def __str__(self) -> str:
         return f"{self.par} = {self.bid} – {self.ask}"

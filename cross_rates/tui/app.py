@@ -15,8 +15,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 from textual.app import App, ComposeResult
-from cross_rates.tui.pratica import PraticaScreen
-from textual.containers import Horizontal, VerticalScroll, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 
@@ -28,6 +27,7 @@ from cross_rates.nucleo import (
     GrafoCambial,
     SemPercurso,
     TaxaJuro,
+    analisa_hedging,
     arbitragem_a_prazo,
     arbitragens_geograficas,
     arbitragens_triangulares,
@@ -35,8 +35,8 @@ from cross_rates.nucleo import (
     forward,
     normaliza_moeda,
     outright_de_pontos,
-    analisa_hedging,
 )
+from cross_rates.tui.pratica import PraticaScreen
 
 # Exemplos do caderno para arranque rápido.
 EXEMPLOS_CROSS = [  # Ex. 12 — sem arbitragem, ilustra cross direto/indireto
@@ -275,7 +275,10 @@ class CrossRatesApp(App):
                     "A Moeda Estrangeira será sempre a COTADA.",
                     classes="dica",
                 )
-                yield Input(placeholder="ex.: pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6", id="hedge")
+                yield Input(
+                    placeholder="ex.: pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6",
+                    id="hedge",
+                )
                 yield Static("Sem análise de hedging ainda.", id="hedge_res")
             with VerticalScroll(id="direita"):
                 yield Static(TEORIA, id="teoria")
@@ -355,7 +358,7 @@ class CrossRatesApp(App):
                 return
             try:
                 novas_cotacoes = []
-                with open(ficheiro, "r", encoding="utf-8") as f:
+                with open(ficheiro, encoding="utf-8") as f:
                     for linha in f:
                         linha = linha.strip()
                         if linha and not linha.startswith("#"):
@@ -429,8 +432,8 @@ class CrossRatesApp(App):
             return
         try:
             n = int(dias)
-            juro_base = TaxaJuro(base, partes[3], partes[4])
-            juro_cotada = TaxaJuro(cotada, partes[5], partes[6])
+            juro_base = TaxaJuro.de_moeda(base, partes[3], partes[4])
+            juro_cotada = TaxaJuro.de_moeda(cotada, partes[5], partes[6])
             r = forward(spot, juro_base, juro_cotada, n)
             arb = None
             if len(partes) == 9:
@@ -491,8 +494,8 @@ class CrossRatesApp(App):
 
         try:
             n = int(dias)
-            juro_base = TaxaJuro(base, partes[5], partes[6])
-            juro_cotada = TaxaJuro(cotada, partes[7], partes[8])
+            juro_base = TaxaJuro.de_moeda(base, partes[5], partes[6])
+            juro_cotada = TaxaJuro.de_moeda(cotada, partes[7], partes[8])
             r = analisa_hedging(tipo, montante, spot, juro_base, juro_cotada, n)
         except (CotacaoInvalida, ValueError) as exc:
             self._erro_hedge(str(exc))
@@ -638,9 +641,10 @@ class CrossRatesApp(App):
         self.query_one("#forward_res", Static).update("\n".join(linhas))
 
     def _mostrar_swap(self, r) -> None:
+        cd = r.casas_decimais_pontos
         linhas = [
-            f"[b]{r.par}[/b] outright (via swap) = [green]{_fmt(r.fwd_bid, r.casas_decimais_pontos)}[/green] – "
-            f"[red]{_fmt(r.fwd_ask, r.casas_decimais_pontos)}[/red]",
+            f"[b]{r.par}[/b] outright (via swap) = "
+            f"[green]{_fmt(r.fwd_bid, cd)}[/green] – [red]{_fmt(r.fwd_ask, cd)}[/red]",
             f"[b]spot:[/b] {_fmt(r.spot_bid)} – {_fmt(r.spot_ask)}    "
             f"[b]pontos:[/b] {_fmt(r.pontos_bid)} / {_fmt(r.pontos_ask)}    "
             f"[b]base a {r.sinal}[/b]",
@@ -652,15 +656,18 @@ class CrossRatesApp(App):
     def _mostrar_hedge(self, r) -> None:
         acao = "Custo" if r.tipo_exposicao == "pagamento" else "Receita"
         linhas = [
-            f"[b]Hedging de {r.tipo_exposicao}:[/b] {_fmt(r.montante_me)} {r.moeda_estrangeira} a {r.dias} dias",
+            f"[b]Hedging de {r.tipo_exposicao}:[/b] {_fmt(r.montante_me)} "
+            f"{r.moeda_estrangeira} a {r.dias} dias",
             "",
-            f"[b u]Forward Hedge[/b u]",
+            "[b u]Forward Hedge[/b u]",
             f"  Taxa forward aplicada: {_fmt(r.fwd_taxa, 6)}",
             f"  {acao} total: [green]{_fmt(r.fwd_resultado_base, 2)} {r.moeda_base}[/green]",
             "",
-            f"[b u]Money Market Hedge[/b u]",
-            f"  1. Valor presente em {r.moeda_estrangeira}: {_fmt(r.mmh_me_presente, 2)} (taxa juro: {_fmt(r.mmh_taxa_juro_base, 4)}%)",
-            f"  2. Conversão spot ({_fmt(r.mmh_spot_taxa, 6)}): {_fmt(r.mmh_base_presente, 2)} {r.moeda_base}",
+            "[b u]Money Market Hedge[/b u]",
+            f"  1. Valor presente em {r.moeda_estrangeira}: "
+            f"{_fmt(r.mmh_me_presente, 2)} (taxa juro: {_fmt(r.mmh_taxa_juro_base, 4)}%)",
+            f"  2. Conversão spot ({_fmt(r.mmh_spot_taxa, 6)}): "
+            f"{_fmt(r.mmh_base_presente, 2)} {r.moeda_base}",
             f"  3. Valor futuro: [green]{_fmt(r.mmh_resultado_base, 2)} {r.moeda_base}[/green]",
             "",
             f"[b]Melhor estratégia:[/b] [bold magenta]{r.melhor_estrategia}[/bold magenta]",

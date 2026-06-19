@@ -11,8 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao, CotacaoInvalida, _para_decimal
-from .forward import TaxaJuro, forward, ResultadoForward
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, _para_decimal
+from .forward import TaxaJuro, forward
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class AnaliseHedging:
 
 def analisa_hedging(
     tipo: str,  # "recebimento" ou "pagamento"
-    montante_estrangeira,
+    montante_estrangeira: Numerico,
     spot: Cotacao,
     juro_base: TaxaJuro,
     juro_estrangeira: TaxaJuro,
@@ -80,47 +80,44 @@ def analisa_hedging(
     fwd_eq = forward(spot, juro_base, juro_estrangeira, dias)
 
     if tipo == "recebimento":
-        # Recebimento em ME (Cotada).
-        # Forward: cliente vende a ME a prazo. Para cotada, cliente vende ao F_bid (porque ele compra base).
-        # A taxa aplicável para transformar Cotada em Base é 1 / F_ask.
-        # Espera, o cliente RECEBE Cotada, logo ele tem de VENDER Cotada e COMPRAR Base.
-        # Banco Vende Base ao ask, logo Cliente Compra Base ao ask.
-        # Quantidade de Base = Montante_ME / F_ask
+        # Recebimento de ME (a moeda cotada) em t = dias.
+        #
+        # Forward hedge: o cliente vende a ME a prazo, i.e. compra a base a prazo.
+        # O banco vende a base ao ask, logo o cliente liquida ao F_ask: a receita
+        # na moeda base é montante_ME / F_ask.
         fwd_taxa = fwd_eq.ask
         fwd_resultado = montante_me / fwd_taxa
 
-        # MMH:
-        # Pede emprestado ME hoje, vende no spot, aplica Base hoje.
-        # 1. Pede emprestado ME: taxa i_ask_ME
-        # Quanto pedir para que com juros dê igual ao Montante_ME a receber?
+        # Money market hedge (replica o forward via MMI):
+        #   1. Pede ME emprestada hoje à taxa i_ask(ME), de modo a que o
+        #      recebimento futuro amortize exatamente o empréstimo:
+        #      PV_ME = montante_ME / (1 + i_ask(ME)·t).
         mmh_me_presente = montante_me / juro_estrangeira.fator("ask", dias)
-        
-        # 2. Vende ME no spot (Compra Base): taxa S_ask
+        #   2. Vende a ME à vista (compra base) ao S_ask.
         mmh_spot_taxa = spot.ask
         mmh_base_presente = mmh_me_presente / mmh_spot_taxa
-
-        # 3. Aplica Base: taxa i_bid_Base
+        #   3. Aplica a base até t à taxa i_bid(base).
         mmh_taxa_juro_base = juro_base.bid
         mmh_resultado = mmh_base_presente * juro_base.fator("bid", dias)
 
     else:
-        # Pagamento em ME (Cotada).
-        # Forward: cliente precisa de ME a prazo. Vai COMPRAR ME e VENDER Base.
-        # Banco Compra Base ao bid, logo Cliente Vende Base ao bid.
-        # Quantidade de Base = Montante_ME / F_bid
+        # Pagamento de ME (a moeda cotada) em t = dias.
+        #
+        # Forward hedge: o cliente compra a ME a prazo, i.e. vende a base a prazo.
+        # O banco compra a base ao bid, logo o cliente liquida ao F_bid: o custo
+        # na moeda base é montante_ME / F_bid.
         fwd_taxa = fwd_eq.bid
         fwd_resultado = montante_me / fwd_taxa
 
-        # MMH:
-        # Toma emprestado Base hoje, compra ME no spot, aplica ME hoje.
-        # 1. Aplica ME para que no futuro seja igual ao Montante_ME: taxa i_bid_ME
+        # Money market hedge (replica o forward via MMI):
+        #   1. Aplica hoje o valor presente da ME à taxa i_bid(ME), de modo a
+        #      que cresça até ao montante a pagar:
+        #      PV_ME = montante_ME / (1 + i_bid(ME)·t).
         mmh_me_presente = montante_me / juro_estrangeira.fator("bid", dias)
-        
-        # 2. Compra ME no spot (Vende Base): taxa S_bid
+        #   2. Compra a ME à vista (vende base) ao S_bid.
         mmh_spot_taxa = spot.bid
         mmh_base_presente = mmh_me_presente / mmh_spot_taxa
-
-        # 3. Pede emprestado Base: taxa i_ask_Base
+        #   3. Financia-se na base até t à taxa i_ask(base).
         mmh_taxa_juro_base = juro_base.ask
         mmh_resultado = mmh_base_presente * juro_base.fator("ask", dias)
 

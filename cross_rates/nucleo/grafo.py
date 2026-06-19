@@ -95,7 +95,7 @@ class GrafoCambial:
     def taxa_percurso(self, percurso: list[str]) -> Decimal:
         """Produto das taxas das arestas ao longo de um percurso de moedas."""
         taxa = Decimal(1)
-        for de, para in zip(percurso, percurso[1:]):
+        for de, para in zip(percurso, percurso[1:], strict=False):
             try:
                 taxa *= self._adjacencia[de][para]
             except KeyError as exc:

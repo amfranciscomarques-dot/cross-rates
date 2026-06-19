@@ -1,145 +1,289 @@
-# Calculadora de Cross-Rates (bid/ask)
+# cross-rates — FX Microstructure, CIP & Arbitrage Toolkit
 
-Calculadora de **taxas cruzadas (cross-rates)** com **bid e ask**, em terminal.
-Deriva o câmbio entre duas moedas que não se cotam diretamente, através de uma
-ou mais moedas-veículo, aplicando em cada conversão a ponta da forquilha
-desfavorável ao cliente — tal como no mercado real.
+A terminal toolkit for **foreign-exchange mathematics**: cross-rates with full
+**bid/ask** microstructure, **covered interest parity** (CIP) forwards with
+real day-count conventions, and **triangular / geographical / term arbitrage**
+detection. Built to be read as a portfolio piece for Quant/FX roles — every
+formula is anchored to a textbook result and locked by unit tests.
 
-Pensada para crescer até uma ferramenta de **arbitragem** (geográfica,
-triangular e a prazo) para empresas e bancos.
+> The core thesis: FX math is *graph traversal over a directed currency graph
+> where every edge carries a two-sided quote*, and arbitrage is simply a cycle
+> whose product of edge weights exceeds 1. This project makes that thesis
+> executable.
 
-## Instalação
+---
 
-```bash
-pip install -e ".[dev]"
+## Why this exists
+
+Most "currency converter" toys take a single mid rate and divide. Real FX is
+two-sided (`bid`/`ask`), the side you transact is always the one *unfavourable
+to you*, and the cross-rate between two minor currencies is derived through a
+vehicle currency (usually USD) — multiplying the spreads at every hop. This
+repository models that faithfully, then layers the no-arbitrage theory on top:
+
+- **Bid/ask microstructure** — every conversion applies the correct leg of the
+  quote (Section 1).
+- **Covered Interest Parity** — forward rates derived from money-market rates,
+  with **Act/360 and Act/365** day counts (Section 3).
+- **Triangular arbitrage** — detected as a profitable cycle in the currency
+  graph (Section 2).
+
+All math runs on `Decimal` (no binary float drift) and the financial core is
+100% type-checked (`mypy --strict`) and unit-tested against solved textbook
+exercises.
+
+---
+
+## 1. Bid/ask microstructure & cross-rates
+
+In the notation `BASE/QUOTE`, the **base** is *certain* (the "1") and the
+**quote** is *uncertain* (the price). The quote says how many units of QUOTE
+buy one unit of BASE, and always satisfies `bid <= ask`:
+
+| Party            | Buys the base | Sells the base |
+| ---------------- | ------------- | -------------- |
+| Market maker     | at the `bid`  | at the `ask`   |
+| Customer         | at the `ask`  | at the `bid`   |
+
+Each quote `BASE/QUOTE (bid b, ask a)` produces **two directed conversions**:
+
+- `BASE → QUOTE` at rate `b`  (sell 1 base, receive `b` quote)
+- `QUOTE → BASE` at rate `1/a` (1 quote buys `1/a` base)
+
+So a cross-rate is just a path in the directed currency graph, and the two sides
+of the cross use *different* paths — the one unfavourable to the customer each
+time:
+
+```python
+from cross_rates.nucleo import Cotacao, GrafoCambial, cross
+
+g = GrafoCambial()
+g.adicionar(Cotacao("EUR", "USD", "1.1574", "1.1576", "Paris"))
+g.adicionar(Cotacao("GBP", "USD", "1.2500", "1.2510", "London"))
+
+r = cross(g, "GBP", "EUR")
+print(r.bid, "/", r.ask)   # 1.0798 / 1.0809  (GBP/EUR via USD)
+print(r.bid_formula)       # bid = bid(GBP/USD) ÷ ask(EUR/USD)
 ```
 
-## Utilizar
+The bid path `GBP→USD→EUR` sells the base (GBP) and collects the worst leg at
+each hop; the ask path `EUR→USD→GBP` is its inverse. This single model reproduces
+the textbook "direct cross (÷)" and "indirect cross (×)" rules automatically,
+and — critically — preserves the spread: the synthetic cross is always wider
+than either component quote.
 
-```bash
-python -m cross_rates        # abre a interface de terminal (TUI)
+---
+
+## 2. Triangular & geographical arbitrage
+
+**Triangular arbitrage.** A 3-currency cycle `A→B→C→A` whose product of edge
+rates (each already on the correct bid/ask leg) **exceeds 1** is risk-free
+profit. The legs are simultaneous, so there is no market risk:
+
+```
+factor = ∏ rates(cycle) > 1   ⟹   profit = (factor − 1) × notional
 ```
 
-Na TUI:
+This is the unified form of the textbook rule "implied cross vs. direct quote":
+if the implied cross (from the cycle) differs from the directly quoted rate, a
+cycle exists whose product departs from 1.
 
-1. **Adicionar cotação** — escreva `BASE COTADA bid ask [fonte]`, ex.:
-   `EUR USD 1.1574 1.1576 Paris`. A fonte (praça/banco) é opcional.
-2. **Calcular cross** — escreva `BASE COTADA`, ex.: `GBP SEK`.
-3. **Arbitragem** — tecla `a` (geográfica + triangular; opcionalmente com montante).
-4. **Forward (PTJ)** — escreva `BASE COTADA dias i_base_bid i_base_ask
-   i_cot_bid i_cot_ask [fwd_bid fwd_ask]`, ex.:
-   `CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079`. O spot vem da
-   tabela; os juros são em % anual (base 360). Com a cotação forward de mercado
-   no fim, verifica também a **arbitragem a prazo**.
-5. Atalhos: `e` exemplos de cross, `x` exemplos triangular, `g` exemplos
-   geográfica, `f` exemplo de forward, `t` painel de teoria, `l` limpa a
-   tabela, `q` sai.
+```python
+from cross_rates.nucleo import Cotacao, GrafoCambial, arbitragens_triangulares
 
-O resultado do cross mostra `bid – ask`, `spread`, **tipo** (direta / inversa /
-cross direto ÷ / cross indireto ×), o **percurso**, as **fórmulas** bid/ask com
-as pontas certas e uma **nota metodológica**. Um **painel de teoria** (tecla `t`)
-resume a convenção, a regra do bid/ask e as regras de cross e arbitragem.
+g = GrafoCambial()
+g.adicionar(Cotacao("EUR", "USD", "1.1574", "1.1576"))
+g.adicionar(Cotacao("GBP", "USD", "1.2500", "1.2510"))
+g.adicionar(Cotacao("GBP", "EUR", "1.1600", "1.1610"))  # mispriced
 
-A arbitragem lista os ciclos de 3 moedas com **fator > 1** (ganho certo),
-detalhando cada perna e, se indicar um montante, o **lucro** e a **simulação**.
+for a in arbitragens_triangulares(g):
+    print(a.ciclo, "factor =", a.fator, "P&L on 1m =", a.lucro(1_000_000))
+```
 
-## Convenção
+**Geographical arbitrage.** The same pair quoted in different venues (the
+optional `fonte` field on each `Cotacao`): profit exists iff the lowest `ask`
+(buy the base) is below the highest `bid` (sell it): `ask(A) < bid(B)` → buy in
+A, sell in B. See `arbitragens_geograficas()`.
 
-Na notação `BASE/COTADA`, a **BASE** está *ao certo* e a **COTADA** *ao
-incerto*: o preço diz quantas unidades de COTADA valem 1 unidade de BASE, com
-`bid <= ask`.
+---
 
-| Quem               | Compra a base | Vende a base |
-| ------------------ | ------------- | ------------ |
-| Banco/market maker | ao bid        | ao ask       |
-| Cliente            | ao ask        | ao bid       |
+## 3. Covered Interest Parity (CIP) forwards
 
-## Como funciona o cálculo
+The **forward** rate is *not* a forecast of the future spot. It is the rate that
+**prevents arbitrage** between transacting the forward directly and replicating
+it in the money market (borrow one currency, convert spot, lend the other). For
+pair `BASE/QUOTE` over `n` days:
 
-Cada cotação `BASE/COTADA (bid b, ask a)` gera duas conversões dirigidas:
+```
+F = S × (1 + i_quote · n / n_q) / (1 + i_base · n / n_b)
+```
 
-- `BASE -> COTADA` à taxa `b` (vender 1 BASE rende `b` COTADA);
-- `COTADA -> BASE` à taxa `1/a` (1 COTADA compra `1/a` BASE).
+where `n_b`, `n_q` are the **day-count bases** of each currency. This is the
+economic content of **Covered Interest Parity** (a.k.a. interest rate parity).
 
-O cross deriva-se de dois percursos no grafo:
+### Day-count conventions
 
-- **bid** (vender a base) = taxa do percurso `BASE -> ... -> COTADA`;
-- **ask** (comprar a base) = `1 / (taxa de COTADA -> ... -> BASE)`.
+The base of the year is a **property of the currency**, not of the calculation.
+`ConvencaoDia` encodes the two conventions that dominate FX money markets:
 
-Este modelo reproduz automaticamente as regras do caderno (cross direto `÷` e
-indireto `×`) e prepara o terreno para a deteção de arbitragem (um ciclo cujo
-produto de taxas seja `> 1`).
+- **Act/360** ("Eurobasis") — USD, EUR, JPY, CHF, CAD, SEK, …
+- **Act/365** ("Sterling basis") — GBP, AUD, NZD
 
-## Arquitetura
+Picking the wrong convention introduces a systematic ~1.4% bias in the prorated
+rate — exactly the kind of silent error that sinks a desk P&L. The convention is
+attached to each `TaxaJuro` and inferred from the currency by default:
+
+```python
+from cross_rates.nucleo import TaxaJuro
+
+TaxaJuro.de_moeda("GBP", "5.0", "5.1").convencao   # Act/365 (auto)
+TaxaJuro.de_moeda("USD", "4.9", "5.0").convencao   # Act/360 (auto)
+```
+
+### Premium / discount & bid/ask
+
+- If `i_quote > i_base` then `F > S`: the base trades at a **forward premium**.
+- If `i_quote < i_base` then `F < S`: the base trades at a **forward discount**.
+
+With two-sided rates, each side of the forward combines the legs that are
+unfavourable to the customer in the money-market replication:
+
+```
+F_bid = S_bid · (1 + i_bid,quote · n/n_q) / (1 + i_ask,base · n/n_b)
+F_ask = S_ask · (1 + i_ask,quote · n/n_q) / (1 + i_bid,base · n/n_b)
+```
+
+```python
+from cross_rates.nucleo import Cotacao, TaxaJuro, forward
+
+spot = Cotacao("CHF", "USD", "1.2700", "1.2705")
+f = forward(spot,
+            TaxaJuro("CHF", "0.1072", "0.1144"),
+            TaxaJuro("USD", "4.9379", "4.9438"),
+            180)
+print(f.bid, "/", f.ask, f.sinal)   # 1.3006 / 1.3012  premium
+```
+
+### Covered interest arbitrage
+
+When the market-quoted forward falls outside the parity band, term arbitrage is
+available: sell the expensive leg, replicate the cheap one through the money
+market. See `arbitragem_a_prazo()`.
+
+### FX swaps (spot + forward)
+
+A swap outright is reconstructed from the spot and the swap points, respecting
+the premium/discount rule (`points_bid < points_ask` → premium, add; the reverse
+→ discount, subtract). The point scale is currency-specific (e.g. JPY quotes on
+2 decimals):
+
+```python
+from cross_rates.nucleo import Cotacao, outright_de_pontos
+
+sw = outright_de_pontos(Cotacao("EUR", "USD", "1.1500", "1.1510"), "20", "30")
+print(sw.fwd_bid, sw.fwd_ask, sw.sinal)   # 1.1520 1.1540 premium
+```
+
+---
+
+## 4. Hedging foreign-currency exposure
+
+For a future payment or receipt in a foreign (quote) currency, two hedges
+replicate each other — and the **theorem is that they must**:
+
+- **Forward hedge** — lock the forward rate today.
+- **Money-market hedge (MMH)** — borrow/lend, convert spot, lend/borrow to
+  replicate the forward synthetically.
+
+In a frictionless market they are *mathematically identical*; this identity
+**is** covered interest parity. With bid/ask spreads they diverge by a few
+basis points, and the cheaper one (cost for a payment, higher for a receipt) is
+chosen:
+
+```python
+from cross_rates.nucleo import Cotacao, TaxaJuro, analisa_hedging
+
+spot = Cotacao("EUR", "USD", "1.0850", "1.0852")
+h = analisa_hedging(
+    "pagamento", 1_000_000, spot,                      # owe USD 1m in 90 days
+    TaxaJuro("EUR", "2.0", "2.1"), TaxaJuro("USD", "4.2", "4.3"), 90,
+)
+print(h.fwd_resultado_base, h.mmh_resultado_base, h.melhor_estrategia)
+# forward cost ≈ MMH cost ≈ EUR 916,870.55  (CIP holds)
+```
+
+Each leg of the MMH uses the correct bid/ask side: for a payment you *invest*
+the quote currency at `i_bid`, convert at `S_bid`, and *borrow* the base at
+`i_ask`; for a receipt the roles and sides invert.
+
+---
+
+## Install
+
+```bash
+pip install -e ".[dev]"          # core + textual TUI + dev tooling
+```
+
+Requires Python ≥ 3.11.
+
+## Terminal UI
+
+```bash
+python -m cross_rates            # or: cross-rates
+```
+
+A Textual interface driving every feature above: add quotes (`EUR USD 1.1574
+1.1576 Paris`), compute crosses, run triangular/geographical/term arbitrage,
+price forwards with day-count-aware rates, and inspect a theory panel (`t`).
+Shortcuts: `e` cross examples, `x`/`g`/`f` arbitrage & forward examples, `l`
+clear, `q` quit.
+
+## Tests, types, lint
+
+```bash
+pytest                  # full suite, with coverage
+ruff check .            # lint + import sorting
+mypy cross_rates/nucleo # strict types on the financial core
+```
+
+The financial core is held to a strict bar: `mypy --strict` clean, and every
+test is anchored to a solved textbook exercise (Madura, Shapiro, Eun & Resnick)
+so the math is validated against an independent source — not just internally
+consistent.
+
+---
+
+## Architecture
 
 ```
 cross_rates/
-  nucleo/           # lógica cambial pura, sem interface (100% testável)
-    cotacao.py      # Cotacao: par, bid, ask (+ validação)
-    grafo.py        # GrafoCambial: moedas (nós) e conversões (arestas)
-    cross.py        # cross(): cross-rate + percurso + tipo + fórmulas + nota
-    arbitragem.py   # arbitragens_geograficas() e _triangulares()
-    forward.py      # forward() PTJ + arbitragem_a_prazo() (TaxaJuro)
+  nucleo/             # pure FX math, no I/O — the type-checked, tested core
+    cotacao.py        # Cotacao: pair, bid, ask (+ validation, Numerico alias)
+    grafo.py          # GrafoCambial: currencies (nodes) + conversions (edges)
+    cross.py          # cross(): cross-rate, path, type, formulas, note
+    arbitragem.py     # triangular + geographical arbitrage as graph cycles
+    forward.py        # CIP forward, ConvencaoDia (Act/360, Act/365), term arb
+    swaps.py          # FX swap outright from spot + swap points
+    hedging.py        # forward hedge vs money-market hedge (CIP replication)
   tui/
-    app.py          # interface Textual (cross, arbitragem, forward, teoria)
-  __main__.py       # python -m cross_rates
-testes/
-  test_cross.py     # trancado às resoluções do Caderno (Ex. 10/11/12/17)
-  test_arbitragem.py# trancado a Ex. 15/16/17/18
-  test_forward.py   # trancado a Ex. 21b/22b/23/27/28
-  test_tui.py       # fluxo headless da interface
+    app.py            # Textual UI (cross, arbitrage, forward, hedge, theory)
+testes/               # pinned to solved exercises + property tests
 ```
 
-## Testes
+The design rule: **all FX math is pure and Decimal-based in `nucleo/`**, with
+zero I/O, so it is fully testable and type-checkable. The TUI is a thin adapter.
 
-```bash
-pytest
-```
+## Roadmap
 
-Os testes do cross-rate reproduzem exercícios resolvidos (Ex. 10, 11, 12, 17),
-validando em simultâneo a matemática e a convenção bid/ask.
+The same `GrafoCambial` backbone supports everything above. Remaining phases:
 
-## Arbitragem
+- **Real-time feeds** — pluggable price source (broker/exchange).
+- **Optionality** — vanilla FX options (Garman-Kohlhagen) on top of the forward
+  curve, for delta hedging of the exposures already modelled.
 
-**Geográfica (espacial)** — mesmo par cotado em praças diferentes (campo `fonte`).
-Há ganho certo se o `ask` mais baixo (compra da base) for inferior ao `bid` mais
-alto (venda): `ask(A) < bid(B)` → compra em A, vende em B. Ver
-`arbitragens_geograficas()`.
+## References
 
-**Triangular** — um **ciclo de 3 moedas** `A→B→C→A` cujo produto das taxas (cada
-uma já na ponta bid/ask correta) é **> 1**:
-
-    fator > 1  ⇒  ganho certo = (fator − 1) × montante inicial
-
-É a forma unificada da regra do caderno "cross implícito ≠ cotação direta".
-Risco nulo, porque as pernas são simultâneas. Ver `arbitragens_triangulares()`.
-
-## Forwards (taxas a prazo) — PTJ
-
-A taxa **forward** de equilíbrio resulta da **Paridade das Taxas de Juro coberta
-(PTJ/CIP)**: é a taxa que impede a arbitragem entre o forward direto e a réplica
-no Mercado Monetário Internacional (não é uma previsão da cotação futura). Para
-o par `BASE/COTADA`, a `dias` dias na base `n/360`:
-
-    F = S × (1 + i_cotada·n/360) ÷ (1 + i_base·n/360)
-
-- `i_cotada > i_base` → `F > S`: a base cotiza-se **a prémio**;
-- `i_cotada < i_base` → `F < S`: a base **a desconto**.
-
-Com bid/ask, cada ponta combina as pernas que desfavorecem o cliente:
-`F_bid = S_bid·(1+i_bid_cot·t)/(1+i_ask_base·t)` e
-`F_ask = S_ask·(1+i_ask_cot·t)/(1+i_bid_base·t)`. Ver `forward()` e `TaxaJuro`.
-
-**Arbitragem a prazo (covered interest arbitrage)** — quando o forward cotado no
-mercado sai do intervalo de equilíbrio, há lucro certo: vende-se a ponta cara e
-replica-se via MMI a barata. Ver `arbitragem_a_prazo()`.
-
-## Roteiro (próximas fases)
-
-Tudo assenta no mesmo `GrafoCambial`:
-
-- ~~**Arbitragem triangular** — cross implícito vs. cotado (Ex. 17–18).~~ ✅ feito.
-- ~~**Arbitragem geográfica** — mesmo par em praças diferentes (Ex. 15–16).~~ ✅ feito.
-- ~~**Forwards / PTJ** — taxas a prazo com bid/ask + arbitragem a prazo (Ex. 21–29).~~ ✅ feito.
-- **Swaps cambiais** — spot + forward de sinais opostos (Ex. 30).
-- **Feeds em tempo real** — fonte de preços conectável (broker/exchange).
+- Madura, *International Financial Management* — money-market hedge, arbitrage.
+- Shapiro, *Multinational Financial Management* — CIP, covered arbitrage.
+- Eun & Resnick, *International Financial Management* — day-count conventions,
+  cross-rate microstructure.

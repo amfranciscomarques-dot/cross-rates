@@ -20,8 +20,8 @@ async def test_fluxo_adicionar_e_calcular():
         await pilot.press("enter")
         await pilot.pause()
 
-        from cross_rates.tui.app import _fmt
         from cross_rates.nucleo import cross
+        from cross_rates.tui.app import _fmt
 
         r = cross(app.grafo, "GBP", "CHF")
         conteudo = str(app.query_one("#resultado").render())

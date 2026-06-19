@@ -376,8 +376,8 @@ def _calcular(grafo: GrafoCambial, ex: Exercicio):
         return arbitragens_geograficas(grafo)
     if p[0] == "forward":
         base, cotada, dias = p[1], p[2], int(p[3])
-        jb = TaxaJuro(base, p[4], p[5])
-        jc = TaxaJuro(cotada, p[6], p[7])
+        jb = TaxaJuro.de_moeda(base, p[4], p[5])
+        jc = TaxaJuro.de_moeda(cotada, p[6], p[7])
         spot = grafo.cotacao_do_par(base, cotada)
         fwd = forward(spot, jb, jc, dias)
         if len(p) == 10:

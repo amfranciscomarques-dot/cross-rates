@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao, CotacaoInvalida, _para_decimal
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, _para_decimal
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,8 @@ class SwapOutright:
 
 def outright_de_pontos(
     spot: Cotacao,
-    pontos_bid,
-    pontos_ask,
+    pontos_bid: Numerico,
+    pontos_ask: Numerico,
     casas_decimais_pontos: int = 4,
 ) -> SwapOutright:
     """Calcula a taxa forward a partir dos pontos de swap.
@@ -66,7 +66,9 @@ def outright_de_pontos(
     pb, pa = _para_decimal(pontos_bid), _para_decimal(pontos_ask)
     
     if pb < 0 or pa < 0:
-        raise CotacaoInvalida("Os pontos de swap devem ser fornecidos como valores positivos absolutos.")
+        raise CotacaoInvalida(
+            "Os pontos de swap devem ser fornecidos como valores positivos absolutos."
+        )
 
     escala = Decimal(10) ** casas_decimais_pontos
     
@@ -84,7 +86,10 @@ def outright_de_pontos(
         f_ask = spot.ask
 
     if f_bid > f_ask:
-        raise CotacaoInvalida("O outright calculado resultou em bid > ask. Verifique os pontos e as casas decimais.")
+        raise CotacaoInvalida(
+            "O outright calculado resultou em bid > ask. "
+            "Verifique os pontos e as casas decimais."
+        )
 
     return SwapOutright(
         base=spot.base,

@@ -21,7 +21,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao
+from .cotacao import Cotacao, Numerico, _para_decimal
 from .grafo import GrafoCambial
 
 
@@ -56,13 +56,13 @@ class Arbitragem:
     def ciclo_texto(self) -> str:
         return " → ".join(self.ciclo)
 
-    def lucro(self, montante) -> Decimal:
+    def lucro(self, montante: Numerico) -> Decimal:
         """Lucro absoluto para um dado montante da moeda inicial."""
-        return Decimal(str(montante)) * (self.fator - Decimal(1))
+        return _para_decimal(montante) * (self.fator - Decimal(1))
 
-    def simulacao(self, montante) -> list[tuple[str, Decimal]]:
+    def simulacao(self, montante: Numerico) -> list[tuple[str, Decimal]]:
         """Montante em cada moeda ao percorrer o ciclo (perna a perna)."""
-        valor = Decimal(str(montante))
+        valor = _para_decimal(montante)
         linhas = [(self.ciclo[0], valor)]
         for passo in self.passos:
             valor = valor * passo.taxa
@@ -85,7 +85,7 @@ def _ciclo(grafo: GrafoCambial, ordem: tuple[str, ...]) -> Arbitragem | None:
     """Avalia o ciclo fechado ``ordem -> ordem[0]``; ``None`` se incompleto."""
     passos: list[Passo] = []
     fator = Decimal(1)
-    for de, para in zip(ordem, ordem[1:] + ordem[:1]):
+    for de, para in zip(ordem, ordem[1:] + ordem[:1], strict=True):
         passo = _passo(grafo, de, para)
         if passo is None:
             return None
@@ -154,12 +154,12 @@ class ArbitragemGeografica:
     def ganho_pct(self) -> Decimal:
         return (self.fator - Decimal(1)) * Decimal(100)
 
-    def lucro(self, montante_base) -> Decimal:
+    def lucro(self, montante_base: Numerico) -> Decimal:
         """Lucro (em moeda cotada) ao arbitrar ``montante_base`` da base."""
-        return Decimal(str(montante_base)) * self.margem
+        return _para_decimal(montante_base) * self.margem
 
-    def simulacao(self, montante_base) -> list[str]:
-        m = Decimal(str(montante_base))
+    def simulacao(self, montante_base: Numerico) -> list[str]:
+        m = _para_decimal(montante_base)
         paga = m * self.ask_compra
         recebe = m * self.bid_venda
         return [
