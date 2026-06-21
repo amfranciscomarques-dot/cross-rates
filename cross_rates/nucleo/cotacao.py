@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 # Entrada numérica tolerante: aceita-se Decimal, int, float ou texto (ex.: a
-# cotação "1.0850"). É sempre normalizada para Decimal via ``_para_decimal``.
+# cotação "1.0850"). É sempre normalizada para Decimal via ``para_decimal``.
 Numerico = Decimal | int | float | str
 
 
@@ -35,7 +35,7 @@ def normaliza_moeda(codigo: str) -> str:
     return c
 
 
-def _para_decimal(valor: Numerico) -> Decimal:
+def para_decimal(valor: Numerico) -> Decimal:
     try:
         # passar por str evita o ruído binário do float (1.0852 != 1.0852000001).
         return Decimal(str(valor))
@@ -57,8 +57,8 @@ class Cotacao:
         # dataclass frozen: usa-se object.__setattr__ para normalizar os campos.
         object.__setattr__(self, "base", normaliza_moeda(self.base))
         object.__setattr__(self, "cotada", normaliza_moeda(self.cotada))
-        object.__setattr__(self, "bid", _para_decimal(self.bid))
-        object.__setattr__(self, "ask", _para_decimal(self.ask))
+        object.__setattr__(self, "bid", para_decimal(self.bid))
+        object.__setattr__(self, "ask", para_decimal(self.ask))
         object.__setattr__(self, "fonte", str(self.fonte).strip())
 
         if self.base == self.cotada:
@@ -96,8 +96,8 @@ class Cotacao:
         return cls(
             base=base,
             cotada=cotada,
-            bid=_para_decimal(bid),
-            ask=_para_decimal(ask),
+            bid=para_decimal(bid),
+            ask=para_decimal(ask),
             fonte=fonte,
         )
 

@@ -1,5 +1,18 @@
 # cross-rates — FX Microstructure, CIP & Arbitrage Toolkit
 
+[![CI](https://github.com/amfranciscomarques-dot/cross-rates/actions/workflows/ci.yml/badge.svg)](https://github.com/amfranciscomarques-dot/cross-rates/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue)
+![mypy: strict](https://img.shields.io/badge/mypy-strict-blue)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+> 🇵🇹 **A note on language.** This README is in English, but the code, tests and
+> terminal UI are in European Portuguese (PT-PT) — my native language, and the
+> language of the *International Finance* coursework whose solved exercises the
+> tests are pinned to. The domain vocabulary maps one-to-one onto standard FX
+> terms: `cotada` = quote currency, `prémio`/`desconto` = forward
+> premium/discount, `arbitragem` = arbitrage, `taxa de juro` = interest rate.
+
 A terminal toolkit for **foreign-exchange mathematics**: cross-rates with full
 **bid/ask** microstructure, **covered interest parity** (CIP) forwards with
 real day-count conventions, and **triangular / geographical / term arbitrage**

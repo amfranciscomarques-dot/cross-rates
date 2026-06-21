@@ -11,7 +11,7 @@ from .arbitragem import (
     arbitragens_geograficas,
     arbitragens_triangulares,
 )
-from .cotacao import Cotacao, CotacaoInvalida, normaliza_moeda
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, normaliza_moeda, para_decimal
 from .cross import ResultadoCross, cross
 from .forward import (
     ArbitragemPrazo,
@@ -29,7 +29,9 @@ from .swaps import SwapOutright, outright_de_pontos
 __all__ = [
     "Cotacao",
     "CotacaoInvalida",
+    "Numerico",
     "normaliza_moeda",
+    "para_decimal",
     "GrafoCambial",
     "SemPercurso",
     "ResultadoCross",

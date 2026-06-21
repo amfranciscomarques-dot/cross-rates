@@ -21,7 +21,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao, Numerico, _para_decimal
+from .cotacao import Cotacao, Numerico, para_decimal
 from .grafo import GrafoCambial
 
 
@@ -58,11 +58,11 @@ class Arbitragem:
 
     def lucro(self, montante: Numerico) -> Decimal:
         """Lucro absoluto para um dado montante da moeda inicial."""
-        return _para_decimal(montante) * (self.fator - Decimal(1))
+        return para_decimal(montante) * (self.fator - Decimal(1))
 
     def simulacao(self, montante: Numerico) -> list[tuple[str, Decimal]]:
         """Montante em cada moeda ao percorrer o ciclo (perna a perna)."""
-        valor = _para_decimal(montante)
+        valor = para_decimal(montante)
         linhas = [(self.ciclo[0], valor)]
         for passo in self.passos:
             valor = valor * passo.taxa
@@ -156,10 +156,10 @@ class ArbitragemGeografica:
 
     def lucro(self, montante_base: Numerico) -> Decimal:
         """Lucro (em moeda cotada) ao arbitrar ``montante_base`` da base."""
-        return _para_decimal(montante_base) * self.margem
+        return para_decimal(montante_base) * self.margem
 
     def simulacao(self, montante_base: Numerico) -> list[str]:
-        m = _para_decimal(montante_base)
+        m = para_decimal(montante_base)
         paga = m * self.ask_compra
         recebe = m * self.bid_venda
         return [

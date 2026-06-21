@@ -36,6 +36,7 @@ from cross_rates.nucleo import (
     normaliza_moeda,
     outright_de_pontos,
 )
+from cross_rates.tui.formato import fmt as _fmt
 from cross_rates.tui.pratica import PraticaScreen
 
 # Exemplos do caderno para arranque rápido.
@@ -127,14 +128,6 @@ Cada cotação BASE/COTADA gera duas conversões dirigidas:
   BASE→COTADA à taxa bid   ;   COTADA→BASE à taxa 1/ask.
 bid do cross = taxa do percurso BASE→…→COTADA; ask = 1/(taxa COTADA→…→BASE).
 """
-
-
-def _fmt(valor: Decimal, casas: int | None = None) -> str:
-    """Formata um Decimal; com ``casas`` arredonda, senão remove zeros supérfluos."""
-    if casas is not None:
-        cota = Decimal(1).scaleb(-casas)
-        return f"{valor.quantize(cota)}"
-    return f"{valor.normalize():f}"
 
 
 class PedeFicheiroModal(ModalScreen[str]):

@@ -122,9 +122,11 @@ def test_ex27c_arbitragem_vender_chf_forward():
                              "1.3076", "1.3079")
     assert arb is not None
     assert arb.sentido.startswith("vender")
-    # PTJ exata dá ≈ +2034 USD (o caderno indica 1991, com um lapso de
-    # multiplicação na cobertura: 999.428,3 × 1,2748 = 1.274.071, não 1.274.117).
-    assert abs(arb.lucro(1_000_000) - Decimal("2034")) < Decimal("3")
+    # Lucro = (mercado_bid − F_ask de equilíbrio) × montante. O sintético de
+    # cobertura é o próprio F_ask de equilíbrio (≈1,3056), pelo que o ganho por
+    # CHF é ≈ 0,001988 → ≈ +1988 USD por 1M CHF, dentro do arredondamento do
+    # caderno (1991).
+    assert abs(arb.lucro(1_000_000) - Decimal("1988")) < Decimal("3")
 
 
 def test_ex28b_arbitragem_comprar_eur_forward():

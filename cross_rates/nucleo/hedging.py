@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao, CotacaoInvalida, Numerico, _para_decimal
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, para_decimal
 from .forward import TaxaJuro, forward
 
 
@@ -72,7 +72,7 @@ def analisa_hedging(
     if tipo not in ("recebimento", "pagamento"):
         raise CotacaoInvalida("Tipo de exposição deve ser 'recebimento' ou 'pagamento'.")
     
-    montante_me = _para_decimal(montante_estrangeira)
+    montante_me = para_decimal(montante_estrangeira)
     if montante_me <= 0:
         raise CotacaoInvalida("O montante deve ser positivo.")
 

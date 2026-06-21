@@ -5,9 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cross-rates"
 version = "0.1.0"
-description = "Calculadora de cross-rates (taxas cruzadas) com bid/ask, em terminal."
+description = "Terminal toolkit for FX cross-rates, CIP forwards and arbitrage with bid/ask microstructure."
 readme = "README.md"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+]
 dependencies = ["textual>=0.80"]
 
 [project.optional-dependencies]

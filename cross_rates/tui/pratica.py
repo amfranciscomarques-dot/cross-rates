@@ -20,13 +20,7 @@ from cross_rates.nucleo import (
     cross,
     forward,
 )
-
-
-def _fmt(valor: Decimal, casas: int | None = None) -> str:
-    if casas is not None:
-        cota = Decimal(1).scaleb(-casas)
-        return f"{valor.quantize(cota)}"
-    return f"{valor.normalize():f}"
+from cross_rates.tui.formato import fmt as _fmt
 
 
 @dataclass

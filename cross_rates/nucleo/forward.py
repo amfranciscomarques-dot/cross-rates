@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-from .cotacao import Cotacao, CotacaoInvalida, Numerico, _para_decimal, normaliza_moeda
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, normaliza_moeda, para_decimal
 
 CEM = Decimal(100)
 
@@ -82,8 +82,8 @@ class TaxaJuro:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "moeda", normaliza_moeda(self.moeda))
-        object.__setattr__(self, "bid", _para_decimal(self.bid))
-        object.__setattr__(self, "ask", _para_decimal(self.ask))
+        object.__setattr__(self, "bid", para_decimal(self.bid))
+        object.__setattr__(self, "ask", para_decimal(self.ask))
         if not isinstance(self.convencao, ConvencaoDia):
             raise CotacaoInvalida(f"Convenção de dia inválida: {self.convencao!r}.")
         if self.bid < 0 or self.ask < 0:
@@ -119,7 +119,7 @@ class TaxaJuro:
             )
         moeda = partes[0]
         conv = convencao if convencao is not None else convencao_por_omissao_moeda(moeda)
-        return cls(moeda, _para_decimal(partes[1]), _para_decimal(partes[2]), conv)
+        return cls(moeda, para_decimal(partes[1]), para_decimal(partes[2]), conv)
 
     @classmethod
     def de_moeda(
@@ -136,7 +136,7 @@ class TaxaJuro:
         (GBP/AUD/NZD → Act/365; restantes → Act/360).
         """
         conv = convencao if convencao is not None else convencao_por_omissao_moeda(moeda)
-        return cls(moeda, _para_decimal(bid), _para_decimal(ask), conv)
+        return cls(moeda, para_decimal(bid), para_decimal(ask), conv)
 
 
 @dataclass(frozen=True)
@@ -293,7 +293,7 @@ class ArbitragemPrazo:
 
     def lucro(self, montante_base: Numerico) -> Decimal:
         """Lucro (em moeda cotada) ao arbitrar ``montante_base`` da base."""
-        return _para_decimal(montante_base) * self.ganho_por_base
+        return para_decimal(montante_base) * self.ganho_por_base
 
 
 def arbitragem_a_prazo(
@@ -311,24 +311,27 @@ def arbitragem_a_prazo(
     ganho por unidade de base não excede ``limiar``.
     """
     eq = forward(spot, juro_base, juro_cotada, dias)
-    mb, ma = _para_decimal(mercado_bid), _para_decimal(mercado_ask)
+    mb, ma = para_decimal(mercado_bid), para_decimal(mercado_ask)
     if mb > ma:
         raise CotacaoInvalida("O forward de mercado tem bid > ask.")
 
-    fb_base_ask = juro_base.fator("ask", dias)
     if mb > eq.ask:
         # Mercado acima do equilíbrio → base sobrevalorizada → vender base forward.
-        # Réplica: aplica base (i_ask), compra base no spot (ask), financia em
-        # cotada (i_ask). Custo sintético por 1 base entregue ao vencimento:
-        sintetico = spot.ask * juro_cotada.fator("ask", dias) / fb_base_ask
+        # Cobertura do short: investe-se a base até ao vencimento (rende i_bid),
+        # comprando-a no spot (ask) e financiando a cotada (i_ask). O custo
+        # sintético por 1 base entregue é exatamente o forward de equilíbrio do
+        # lado ask (F_ask), já calculado em `eq` — reutiliza-se em vez de o
+        # recalcular (e de o recalcular com a ponta errada).
+        sintetico = eq.ask
         ganho = mb - sintetico
         sentido = "vender base forward (base sobrevalorizada a prazo)"
         taxa = mb
     elif ma < eq.bid:
         # Mercado abaixo do equilíbrio → base subvalorizada → comprar base forward.
-        # Réplica: pede base emprestada (i_ask), vende no spot (bid), aplica a
-        # cotada (i_bid). Valor sintético por 1 base produzida ao vencimento:
-        sintetico = spot.bid * juro_cotada.fator("bid", dias) / fb_base_ask
+        # Réplica: pede-se a base emprestada (i_ask), vende-se no spot (bid) e
+        # aplica-se a cotada (i_bid). O valor sintético por 1 base produzida é o
+        # forward de equilíbrio do lado bid (F_bid).
+        sintetico = eq.bid
         ganho = sintetico - ma
         sentido = "comprar base forward (base subvalorizada a prazo)"
         taxa = ma

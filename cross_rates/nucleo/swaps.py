@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .cotacao import Cotacao, CotacaoInvalida, Numerico, _para_decimal
+from .cotacao import Cotacao, CotacaoInvalida, Numerico, para_decimal
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ def outright_de_pontos(
     - pontos_bid < pontos_ask: soma-se (base a prémio)
     - pontos_bid > pontos_ask: subtrai-se (base a desconto)
     """
-    pb, pa = _para_decimal(pontos_bid), _para_decimal(pontos_ask)
+    pb, pa = para_decimal(pontos_bid), para_decimal(pontos_ask)
     
     if pb < 0 or pa < 0:
         raise CotacaoInvalida(
