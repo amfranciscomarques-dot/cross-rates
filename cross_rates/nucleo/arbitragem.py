@@ -208,7 +208,7 @@ def arbitragens_geograficas(
                 compra = (fonte, ask)
             if venda is None or bid > venda[1]:
                 venda = (fonte, bid)
-        if compra is None or venda is None:
+        if compra is None or venda is None:  # pragma: no cover - len(membros)>=2 garante ambos
             continue
         if venda[1] > compra[1] * minimo and compra[0] != venda[0]:
             oportunidades.append(

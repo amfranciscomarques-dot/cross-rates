@@ -120,3 +120,64 @@ def test_swap_e_hedge(cliente: TestClient) -> None:
         data={"hedge": "pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6", "cotacoes": cots},
     )
     assert "Melhor estratégia" in r.text
+
+
+# --- ramos de erro de cada operação ---------------------------------------- #
+
+
+def test_arbitragem_montante_invalido_devolve_erro(cliente: TestClient) -> None:
+    r = cliente.post("/arbitragem", data={"montante": "abc", "cotacoes": []})
+    assert r.status_code == 200
+    assert "erro" in r.text.lower()
+
+
+def test_forward_formato_invalido_devolve_erro(cliente: TestClient) -> None:
+    r = cliente.post("/forward", data={"forward": "EUR USD", "cotacoes": []})
+    assert r.status_code == 200
+    assert "erro" in r.text.lower()
+
+
+def test_swap_formato_invalido_devolve_erro(cliente: TestClient) -> None:
+    r = cliente.post("/swap", data={"swap": "EUR USD 20", "cotacoes": []})
+    assert r.status_code == 200
+    assert "erro" in r.text.lower()
+
+
+def test_hedge_formato_invalido_devolve_erro(cliente: TestClient) -> None:
+    r = cliente.post("/hedge", data={"hedge": "pagamento 500000 EUR", "cotacoes": []})
+    assert r.status_code == 200
+    assert "erro" in r.text.lower()
+
+
+# --- entry-points ----------------------------------------------------------- #
+
+
+def test_serve_arranca_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``serve()`` apenas configura e delega no uvicorn — não abrimos socket."""
+    import uvicorn
+
+    from cross_rates.web import app as fastapi_app
+    from cross_rates.web.app import serve
+
+    chamado: dict[str, object] = {}
+
+    def _fake_run(app_obj: object, **kwargs: object) -> None:
+        chamado["app"] = app_obj
+        chamado["kwargs"] = kwargs
+
+    monkeypatch.setattr(uvicorn, "run", _fake_run)
+    serve()
+    assert chamado["app"] is fastapi_app
+    assert chamado["kwargs"]["port"] == 8000
+
+
+def test_modulo_main_invoca_a_tui(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``python -m cross_rates`` chama ``cross_rates.tui.main`` sem abrir a TUI."""
+    import runpy
+
+    import cross_rates.tui as tui
+
+    chamado: list[bool] = []
+    monkeypatch.setattr(tui, "main", lambda: chamado.append(True))
+    runpy.run_module("cross_rates", run_name="__main__")
+    assert chamado == [True]

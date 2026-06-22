@@ -85,7 +85,9 @@ def outright_de_pontos(
         f_bid = spot.bid
         f_ask = spot.ask
 
-    if f_bid > f_ask:
+    # Inalcançável com spot.bid <= spot.ask e pontos >= 0 (prémio/desconto só
+    # alargam o spread); mantido como guarda defensiva contra inputs futuros.
+    if f_bid > f_ask:  # pragma: no cover
         raise CotacaoInvalida(
             "O outright calculado resultou em bid > ask. "
             "Verifique os pontos e as casas decimais."

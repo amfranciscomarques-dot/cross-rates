@@ -81,7 +81,9 @@ def _classifica(grafo: GrafoCambial, percurso: list[str]) -> str:
             mesmo_lado = (c1.base == pivo) == (c2.base == pivo)
             estilo = "direto (÷)" if mesmo_lado else "indireto (×)"
             return f"cross {estilo} via {pivo}"
-        return f"cross via {pivo}"
+        # Inalcançável: toda a aresta do percurso (BFS) provém de uma cotação,
+        # logo c1/c2 nunca são None; mantido por robustez/narrowing.
+        return f"cross via {pivo}"  # pragma: no cover
     return f"cadeia ({len(percurso) - 1} saltos)"
 
 

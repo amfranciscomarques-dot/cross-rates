@@ -51,7 +51,15 @@ testpaths = ["testes"]
 # Textual's run_test() drives an asyncio event loop; "auto" lets the async
 # test coroutines run without a per-test marker.
 asyncio_mode = "auto"
-addopts = "--cov=cross_rates --cov-report=term-missing"
+addopts = "--cov=cross_rates --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+# A TUI interativa (Textual) fica fora da medição de cobertura, tal como fica
+# fora do mypy --strict (ver [tool.mypy] abaixo): é código de event-loop com
+# I/O de terminal, integration-tested em test_tui.py/test_pratica.py, onde
+# perseguir cobertura por linha rende pouco. O gate de 100% aplica-se ao núcleo
+# financeiro, à camada de serviço, ao frontend web e aos entry-points.
+omit = ["cross_rates/tui/*"]
 
 [tool.ruff]
 line-length = 100
