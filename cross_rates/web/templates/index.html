@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cross-Rates — bid/ask</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="topo">
+    <h1><span class="tick">▸</span> Cross-Rates</h1>
+    <span class="sub">câmbios cruzados, forwards (PTJ) e arbitragem · bid/ask</span>
+    <span class="conv">notação <b>BASE/COTADA</b> — base ao certo, cotada ao incerto, bid ≤ ask</span>
+  </header>
+
+  <main>
+    <div class="coluna-esq">
+
+      <!-- Tabela de cotações + estado (inputs ocultos reenviados a cada operação) -->
+      <section class="painel">
+        <h2>Cotações</h2>
+        <p class="dica">
+          A tabela é o estado da sessão — guardado no browser e reenviado a cada
+          cálculo. Carregue exemplos do caderno ou adicione as suas.
+        </p>
+        <div class="barra-botoes">
+          <button hx-post="/exemplos/cross" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela">Ex. cross (12)</button>
+          <button hx-post="/exemplos/arbitragem" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela">Ex. triangular (17)</button>
+          <button hx-post="/exemplos/geografica" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela">Ex. geográfica (15)</button>
+          <button hx-post="/exemplos/forward" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela"
+                  hx-on::after-request="document.getElementById('forward').value = this.dataset.fwd"
+                  data-fwd="{{ exemplo_forward }}">Ex. forward (27)</button>
+          <button hx-post="/limpar" hx-target="#tabela" hx-swap="outerHTML">Limpar</button>
+        </div>
+
+        {% include "partials/_tabela.html" %}
+
+        <form class="linha" style="margin-top:14px"
+              hx-post="/cotacoes" hx-target="#tabela" hx-swap="outerHTML"
+              hx-include="#tabela" hx-on::after-request="this.reset()">
+          <input type="text" name="cotacao" placeholder="ex.: EUR USD 1.1574 1.1576 Paris" autocomplete="off">
+          <button class="primario" type="submit">Adicionar</button>
+        </form>
+      </section>
+
+      <!-- Cross-rate -->
+      <section class="painel">
+        <h2>Calcular cross-rate</h2>
+        <p class="dica">BASE COTADA. bid = vender a base; ask = comprar a base (ponta do cliente).</p>
+        <form class="linha" hx-post="/cross" hx-target="#resultado" hx-include="#tabela">
+          <input type="text" name="calc" placeholder="ex.: GBP SEK" autocomplete="off">
+          <button class="primario" type="submit">Calcular</button>
+        </form>
+        <div class="resultado" id="resultado">
+          <span class="placeholder">Introduza cotações e calcule um cross.</span>
+        </div>
+      </section>
+
+      <!-- Arbitragem -->
+      <section class="painel">
+        <h2>Arbitragem (geográfica + triangular)</h2>
+        <p class="dica">
+          Procura ganhos certos: mesmo par em praças diferentes e ciclos de 3
+          moedas (fator &gt; 1). Indique um montante para ver o lucro e a simulação.
+        </p>
+        <form class="linha" hx-post="/arbitragem" hx-target="#arb" hx-include="#tabela">
+          <input type="text" name="montante" id="montante" placeholder="montante da moeda inicial (opcional, ex.: 1000000)" autocomplete="off">
+          <button class="primario" type="submit">Procurar</button>
+        </form>
+        <div class="resultado" id="arb">
+          <span class="placeholder">Sem análise de arbitragem ainda.</span>
+        </div>
+      </section>
+
+      <!-- Forward -->
+      <section class="painel">
+        <h2>Forward (taxa a prazo, PTJ)</h2>
+        <p class="dica">
+          BASE COTADA dias  i_base(bid ask)  i_cotada(bid ask)  [fwd_bid fwd_ask].
+          O spot vem da tabela; juros em % anual (base 360). Com o forward de
+          mercado no fim, verifica também a arbitragem a prazo (usa o montante acima).
+        </p>
+        <form class="linha" hx-post="/forward" hx-target="#forward_res" hx-include="#tabela, #montante">
+          <input type="text" name="forward" id="forward" placeholder="ex.: CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079" autocomplete="off">
+          <button class="primario" type="submit">Calcular</button>
+        </form>
+        <div class="resultado" id="forward_res">
+          <span class="placeholder">Sem cálculo de forward ainda.</span>
+        </div>
+      </section>
+
+      <!-- Swap -->
+      <section class="painel">
+        <h2>Swaps (pontos forward)</h2>
+        <p class="dica">
+          BASE COTADA pontos_bid pontos_ask [casas_decimais]. O spot tem de estar
+          na tabela. Padrão: 4 casas decimais.
+        </p>
+        <form class="linha" hx-post="/swap" hx-target="#swap_res" hx-include="#tabela">
+          <input type="text" name="swap" placeholder="ex.: EUR USD 20 30" autocomplete="off">
+          <button class="primario" type="submit">Calcular</button>
+        </form>
+        <div class="resultado" id="swap_res">
+          <span class="placeholder">Sem cálculo de swap ainda.</span>
+        </div>
+      </section>
+
+      <!-- Hedging -->
+      <section class="painel">
+        <h2>Hedging (cobertura de risco)</h2>
+        <p class="dica">
+          TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a). TIPO =
+          recebimento | pagamento. A moeda estrangeira é sempre a COTADA.
+        </p>
+        <form class="linha" hx-post="/hedge" hx-target="#hedge_res" hx-include="#tabela">
+          <input type="text" name="hedge" placeholder="ex.: pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6" autocomplete="off">
+          <button class="primario" type="submit">Analisar</button>
+        </form>
+        <div class="resultado" id="hedge_res">
+          <span class="placeholder">Sem análise de hedging ainda.</span>
+        </div>
+      </section>
+
+    </div>
+
+    <aside class="teoria">
+      <div class="corpo">
+        <h2>Enquadramento teórico</h2>
+
+        <h3>1. Convenção A/B</h3>
+        <p>A = base (ao certo, 1 unidade); B = cotada (ao incerto, valor variável).
+        O preço diz quantas unidades de B valem 1 A. Mostra-se <b>bid – ask</b>, bid ≤ ask.</p>
+
+        <h3>2. Regra de ouro do bid/ask</h3>
+        <p>• Banco/market maker: compra a base ao <b>bid</b>, vende ao <b>ask</b>.<br>
+        • Cliente/empresa: compra a base ao <b>ask</b>, vende ao <b>bid</b>.<br>
+        • Empresa: recebe ME → vai <b>vender</b>; paga ME → vai <b>comprar</b>.<br>
+        Spread = ask − bid (a margem do banco).</p>
+
+        <h3>3. Cross-rate (taxa cruzada)</h3>
+        <p>Câmbio entre duas moedas sem cotação direta, via uma moeda-veículo C.
+        Em cada conversão aplica-se a ponta <b>desfavorável</b> ao cliente — passar
+        por uma moeda intermédia nunca contorna a margem.</p>
+        <div class="formula-blk">Cross direto (÷) — C do mesmo lado:
+  X/Y = (X/C) ÷ (Y/C)
+  bid = bid(X/C) ÷ ask(Y/C) ; ask = ask(X/C) ÷ bid(Y/C)
+
+Cross indireto (×) — C em lados opostos:
+  X/Y = (X/C) × (C/Y)
+  bid = bid(X/C) × bid(C/Y) ; ask = ask(X/C) × ask(C/Y)</div>
+
+        <h3>4. Arbitragem geográfica</h3>
+        <p>Mesmo par cotado em praças diferentes. Há ganho certo se o
+        <b>ask mais baixo</b> (onde se compra a base) for inferior ao
+        <b>bid mais alto</b>: <code>ask(A) &lt; bid(B)</code> ⇒ compra em A, vende
+        em B. Ganho na moeda cotada.</p>
+
+        <h3>5. Arbitragem triangular</h3>
+        <p>Inconsistência entre três pares. Um ciclo A→B→C→A cujo <b>produto das
+        taxas</b> seja <code>&gt; 1</code> ⇒ ganho certo = (fator − 1) × montante.
+        Risco nulo: pernas simultâneas.</p>
+
+        <h3>6. Forward (PTJ)</h3>
+        <p>Câmbio fixado hoje para uma data futura. Taxa de equilíbrio que impede
+        a arbitragem com a réplica no mercado monetário:</p>
+        <div class="formula-blk">F = S × (1 + i_cotada·n/360) ÷ (1 + i_base·n/360)</div>
+        <p>• i_cotada &gt; i_base → F &gt; S: base a <b>prémio</b>.<br>
+        • i_cotada &lt; i_base → F &lt; S: base a <b>desconto</b>.<br>
+        <b>Arbitragem a prazo:</b> se o forward de mercado sai do intervalo de
+        equilíbrio, vende-se o caro e replica-se via MMI o barato.</p>
+
+        <h3>7. Como esta ferramenta calcula</h3>
+        <p>Cada cotação BASE/COTADA gera duas conversões dirigidas: BASE→COTADA à
+        taxa bid; COTADA→BASE à taxa 1/ask. O bid do cross é o percurso
+        BASE→…→COTADA; o ask é 1/(taxa COTADA→…→BASE).</p>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>

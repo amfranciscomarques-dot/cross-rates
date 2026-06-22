@@ -1,0 +1,33 @@
+{# Tabela de cotações + estado da sessão. Os <input hidden name="cotacoes">
+   são o estado: o HTMX reenvia-os (hx-include="#tabela") a cada operação,
+   e o servidor reconstrói o grafo a partir deles. #}
+<div id="tabela">
+  {% for linha in linhas %}
+    <input type="hidden" name="cotacoes" value="{{ linha.raw }}">
+  {% endfor %}
+
+  <div class="tabela-wrap">
+    {% if linhas %}
+    <table class="cotacoes">
+      <thead>
+        <tr><th>Par</th><th>bid</th><th>ask</th><th>spread</th><th>fonte</th></tr>
+      </thead>
+      <tbody>
+        {% for linha in linhas %}
+        <tr>
+          <td class="par">{{ linha.d.par }}</td>
+          <td class="bid">{{ linha.d.bid }}</td>
+          <td class="ask">{{ linha.d.ask }}</td>
+          <td>{{ linha.d.spread }}</td>
+          <td class="fonte">{{ linha.d.fonte }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="vazio">Sem cotações. Carregue um conjunto de exemplos ou adicione uma cotação.</div>
+    {% endif %}
+  </div>
+
+  <div class="msg-estado {{ 'erro' if msg.startswith('Erro') else '' }}">{{ msg }}</div>
+</div>

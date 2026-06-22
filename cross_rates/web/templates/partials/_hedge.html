@@ -1,0 +1,18 @@
+{# Análise de hedging: Forward vs Money Market (espelha _mostrar_hedge da TUI). #}
+<div>
+  <b>Hedging de {{ r.tipo_exposicao }}:</b> {{ r.montante_me }}
+  {{ r.moeda_estrangeira }} a {{ r.dias }} dias
+</div>
+
+<h3>Forward Hedge</h3>
+<div class="linha-kv"><span class="k">Taxa forward aplicada</span><span>{{ r.fwd_taxa }}</span></div>
+<div class="linha-kv"><span class="k">{{ r.acao }} total</span><span class="bid">{{ r.fwd_resultado_base }} {{ r.moeda_base }}</span></div>
+
+<h3>Money Market Hedge</h3>
+<div class="formula">1. Valor presente em {{ r.moeda_estrangeira }}: {{ r.mmh_me_presente }} (taxa juro: {{ r.mmh_taxa_juro_base }}%)</div>
+<div class="formula">2. Conversão spot ({{ r.mmh_spot_taxa }}): {{ r.mmh_base_presente }} {{ r.moeda_base }}</div>
+<div class="formula">3. Valor futuro: <span class="bid">{{ r.mmh_resultado_base }} {{ r.moeda_base }}</span></div>
+
+<div style="margin-top:12px">
+  <b>Melhor estratégia:</b> <span class="melhor">{{ r.melhor_estrategia }}</span>
+</div>

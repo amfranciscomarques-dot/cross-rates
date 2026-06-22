@@ -1,0 +1,35 @@
+{# Forward (PTJ) + arbitragem a prazo (espelha _mostrar_forward da TUI). #}
+<div>
+  <span class="par-grande">{{ r.par }}</span> forward {{ r.dias }}d &nbsp;=&nbsp;
+  <span class="bid">{{ r.bid }}</span> – <span class="ask">{{ r.ask }}</span>
+  <span class="dim">(spread {{ r.spread }})</span>
+</div>
+<div class="linha-kv">
+  <span class="k">spot</span>
+  <span>{{ r.spot_bid }} – {{ r.spot_ask }}
+    &nbsp;·&nbsp; pontos {{ r.pontos_bid }} / {{ r.pontos_ask }}
+    &nbsp; <span class="chip {{ 'prem' if r.sinal == 'prémio' else 'desc' }}">base a {{ r.sinal }}</span>
+  </span>
+</div>
+<div class="formula">{{ r.bid_formula }}</div>
+<div class="formula">{{ r.ask_formula }}</div>
+<div class="nota">{{ r.nota }}</div>
+
+{% if arb %}
+<h3>Arbitragem a prazo</h3>
+<div>
+  mercado {{ arb.mercado_bid }}–{{ arb.mercado_ask }}
+  vs equilíbrio {{ arb.equilibrio_bid }}–{{ arb.equilibrio_ask }}
+</div>
+<div>
+  → <b>{{ arb.sentido }}</b> @ {{ arb.taxa_mercado }};
+  sintético {{ arb.sintetico }} <span class="gain">(+{{ arb.ganho_pct }}%)</span>
+</div>
+{% if arb.lucro %}
+<div class="gain">lucro ≈ +{{ arb.lucro }} {{ arb.cotada }} <span class="dim">(por {{ arb.montante }} {{ arb.base }})</span></div>
+{% endif %}
+{% elif tem_mercado %}
+<h3>Arbitragem a prazo</h3>
+<div><b>Sem arbitragem a prazo:</b> o forward de mercado está dentro do intervalo
+de equilíbrio (preços consistentes com a PTJ).</div>
+{% endif %}

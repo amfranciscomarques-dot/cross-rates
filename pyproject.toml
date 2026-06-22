@@ -18,6 +18,12 @@ classifiers = [
 dependencies = ["textual>=0.80"]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
@@ -25,13 +31,20 @@ dev = [
     "anyio>=4",
     "ruff>=0.6",
     "mypy>=1.11",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
 cross-rates = "cross_rates.tui:main"
+cross-rates-web = "cross_rates.web:serve"
 
 [tool.setuptools.packages.find]
 include = ["cross_rates*"]
+
+[tool.setuptools.package-data]
+# Garante que os templates Jinja e os estáticos (CSS/htmx) seguem no wheel,
+# não só no modo editável — caso contrário a web UI falha ao instalar.
+"cross_rates.web" = ["templates/**/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["testes"]
@@ -48,11 +61,17 @@ target-version = "py311"
 # E/F (pyflakes+pycodestyle), I (isort), UP (pyupgrade), B (bugbear).
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# FastAPI usa `= Form([])` para campos de formulário opcionais (lista de cotações);
+# o default mutável é idiomático e não é mutado em runtime, por isso ignora-se B006.
+"cross_rates/web/app.py" = ["B006"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_unused_ignores = true
-# We hold the financial core to a strict bar. The Textual UI layer leans on a
-# dynamically-typed widget API where strict checking is mostly noise, so it is
-# intentionally outside the type-checked surface.
-files = ["cross_rates/nucleo"]
+# We hold the financial core AND the framework-agnostic service layer to a
+# strict bar. The UI layers (Textual TUI and the FastAPI/Jinja web frontend)
+# lean on dynamically-typed framework APIs where strict checking is mostly
+# noise, so they are intentionally outside the type-checked surface.
+files = ["cross_rates/nucleo", "cross_rates/servico"]

@@ -1,0 +1,306 @@
+/* Cross-Rates — folha de estilo única (local-first, sem frameworks).
+   Estética de "terminal de mesa de câmbios": fundo escuro, numerais
+   tabulares monoespaçados, acento teal para bid e âmbar/rosa para ask. */
+
+:root {
+  --bg: #0c1116;
+  --bg-elev: #121a22;
+  --bg-input: #0a0f14;
+  --line: #1f2b36;
+  --line-soft: #18222c;
+  --txt: #d7e2ec;
+  --txt-dim: #7d8d9c;
+  --txt-faint: #56646f;
+  --bid: #3fd1a3;
+  --ask: #ff7a8a;
+  --accent: #6fb3ff;
+  --gain: #5fe0a8;
+  --warn: #ffce6b;
+  --radius: 10px;
+  --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, #15212d 0%, transparent 60%),
+    var(--bg);
+  color: var(--txt);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); }
+
+/* ---- cabeçalho ---------------------------------------------------------- */
+header.topo {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(20,30,40,.55), transparent);
+}
+header.topo h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: .3px;
+  font-weight: 650;
+}
+header.topo h1 .tick { color: var(--bid); }
+header.topo .sub {
+  color: var(--txt-dim);
+  font-size: 13px;
+}
+header.topo .conv {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--txt-faint);
+}
+header.topo .conv b { color: var(--txt-dim); font-weight: 600; }
+
+/* ---- layout ------------------------------------------------------------- */
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 28px;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 26px 28px 60px;
+}
+@media (max-width: 1000px) {
+  main { grid-template-columns: 1fr; }
+}
+
+section.painel {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 22px;
+}
+section.painel > h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--accent);
+  font-weight: 600;
+}
+section.painel > p.dica {
+  margin: 0 0 14px;
+  color: var(--txt-dim);
+  font-size: 13px;
+}
+
+/* ---- formulários -------------------------------------------------------- */
+form.linha { display: flex; gap: 8px; }
+input[type="text"] {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--txt);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 10px 12px;
+  transition: border-color .15s, box-shadow .15s;
+}
+input[type="text"]::placeholder { color: var(--txt-faint); }
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(111,179,255,.12);
+}
+
+button {
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--txt);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 550;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+  white-space: nowrap;
+}
+button:hover { border-color: var(--accent); color: #fff; }
+button.primario {
+  background: rgba(111,179,255,.12);
+  border-color: rgba(111,179,255,.4);
+  color: #cfe4ff;
+}
+button.primario:hover { background: rgba(111,179,255,.2); }
+
+.barra-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.barra-botoes button { font-size: 12px; padding: 7px 11px; }
+
+/* ---- tabela de cotações ------------------------------------------------- */
+.tabela-wrap { margin-bottom: 14px; }
+table.cotacoes {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 13.5px;
+}
+table.cotacoes th {
+  text-align: right;
+  color: var(--txt-faint);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+table.cotacoes th:first-child,
+table.cotacoes td:first-child { text-align: left; }
+table.cotacoes td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
+}
+table.cotacoes tr:last-child td { border-bottom: none; }
+table.cotacoes td.par { color: var(--txt); font-weight: 600; }
+table.cotacoes td.bid { color: var(--bid); }
+table.cotacoes td.ask { color: var(--ask); }
+table.cotacoes td.fonte { color: var(--txt-dim); text-align: left; }
+.vazio {
+  color: var(--txt-faint);
+  font-style: italic;
+  padding: 14px 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+}
+.msg-estado {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--bid);
+  margin-top: 10px;
+  min-height: 16px;
+}
+.msg-estado.erro { color: var(--ask); }
+
+/* ---- painéis de resultado ---------------------------------------------- */
+.resultado {
+  margin-top: 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  min-height: 22px;
+}
+.resultado .placeholder { color: var(--txt-faint); font-style: italic; }
+.resultado .erro { color: var(--ask); }
+.resultado h3 {
+  margin: 0 0 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--txt-dim);
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 6px;
+}
+.resultado h3 + h3 { margin-top: 16px; }
+.par-grande {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--txt);
+  letter-spacing: .3px;
+}
+.bid { color: var(--bid); }
+.ask { color: var(--ask); }
+.gain { color: var(--gain); font-weight: 600; }
+.dim { color: var(--txt-dim); }
+.formula {
+  color: var(--txt-dim);
+  font-size: 12.5px;
+  margin: 2px 0;
+}
+.nota {
+  color: var(--txt-faint);
+  font-style: italic;
+  font-size: 12.5px;
+  margin-top: 8px;
+  font-family: var(--sans);
+}
+.chip {
+  display: inline-block;
+  font-size: 11px;
+  font-family: var(--sans);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--txt-dim);
+}
+.chip.prem { color: var(--gain); border-color: rgba(95,224,168,.4); }
+.chip.desc { color: var(--warn); border-color: rgba(255,206,107,.4); }
+ul.passos { margin: 8px 0; padding-left: 18px; }
+ul.passos li { margin: 3px 0; color: var(--txt-dim); }
+ul.passos li .taxa { color: var(--txt); }
+.bloco-arb { margin-bottom: 18px; }
+.bloco-arb:last-child { margin-bottom: 0; }
+.linha-kv { display: flex; gap: 8px; margin: 3px 0; }
+.linha-kv .k { color: var(--txt-faint); min-width: 150px; }
+.sim-cadeia { color: var(--txt); margin: 4px 0; }
+.melhor { color: #e7c6ff; font-weight: 650; }
+
+/* ---- painel de teoria --------------------------------------------------- */
+aside.teoria {
+  position: sticky;
+  top: 26px;
+  align-self: start;
+}
+aside.teoria .corpo {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 22px 22px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  font-size: 13.5px;
+}
+aside.teoria h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--accent);
+}
+aside.teoria h3 { font-size: 14px; color: var(--txt); margin: 18px 0 4px; }
+aside.teoria p { color: var(--txt-dim); margin: 6px 0; }
+aside.teoria code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--warn);
+  background: rgba(255,206,107,.07);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+aside.teoria .formula-blk {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--txt);
+  background: var(--bg-input);
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+}

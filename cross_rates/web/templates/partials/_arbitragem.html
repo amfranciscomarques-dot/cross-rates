@@ -1,0 +1,49 @@
+{# Arbitragem geográfica + triangular (espelha _mostrar_arbitragem da TUI). #}
+{% if not geograficas and not triangulares %}
+  <div>
+    <b>Sem arbitragem.</b> Nenhum par em praças diferentes tem ask &lt; bid
+    cruzado, e nenhum ciclo de 3 moedas tem fator &gt; 1: os preços são
+    mutuamente consistentes.
+  </div>
+{% else %}
+
+  {% if geograficas %}
+  <h3>Arbitragem geográfica</h3>
+  {% for arb in geograficas %}
+  <div class="bloco-arb">
+    <div>
+      <b>{{ loop.index }}. {{ arb.par }}</b> — comprar em {{ arb.fonte_compra }}
+      @ ask {{ arb.ask_compra }} → vender em {{ arb.fonte_venda }} @ bid
+      {{ arb.bid_venda }} <span class="gain">(+{{ arb.ganho_pct }}%)</span>
+    </div>
+    {% if arb.simulacao %}
+      {% for passo in arb.simulacao %}<div class="formula">{{ passo }}</div>{% endfor %}
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if triangulares %}
+  <h3>Arbitragem triangular</h3>
+  {% for arb in triangulares %}
+  <div class="bloco-arb">
+    <div>
+      <b>{{ loop.index }}. {{ arb.ciclo }}</b> — fator {{ arb.fator }}
+      <span class="gain">(+{{ arb.ganho_pct }}%)</span>
+    </div>
+    <ul class="passos">
+      {% for p in arb.passos %}
+      <li>{{ p.descricao }} @ <span class="taxa">{{ p.taxa }}</span></li>
+      {% endfor %}
+    </ul>
+    {% if arb.simulacao %}
+    <div class="sim-cadeia">
+      {% for s in arb.simulacao %}{{ s.valor }} {{ s.moeda }}{% if not loop.last %} &nbsp; {% endif %}{% endfor %}
+    </div>
+    <div class="gain">lucro ≈ +{{ arb.lucro }} {{ arb.moeda_lucro }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{% endif %}

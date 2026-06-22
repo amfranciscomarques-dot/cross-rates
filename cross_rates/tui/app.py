@@ -12,7 +12,7 @@ Construída sobre o núcleo puro (``cross_rates.nucleo``). Componentes:
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -26,37 +26,22 @@ from cross_rates.nucleo import (
     CotacaoInvalida,
     GrafoCambial,
     SemPercurso,
-    TaxaJuro,
-    analisa_hedging,
-    arbitragem_a_prazo,
-    arbitragens_geograficas,
-    arbitragens_triangulares,
-    cross,
-    forward,
-    normaliza_moeda,
-    outright_de_pontos,
+)
+from cross_rates.servico import (
+    EXEMPLO_FORWARD_INPUT,
+    EXEMPLOS_ARBITRAGEM,
+    EXEMPLOS_CROSS,
+    EXEMPLOS_FORWARD_SPOT,
+    EXEMPLOS_GEOGRAFICA,
+    analisar_arbitragem,
+    calcular_cross,
+    calcular_forward,
+    calcular_hedge,
+    calcular_swap,
+    parse_montante,
 )
 from cross_rates.tui.formato import fmt as _fmt
 from cross_rates.tui.pratica import PraticaScreen
-
-# Exemplos do caderno para arranque rápido.
-EXEMPLOS_CROSS = [  # Ex. 12 — sem arbitragem, ilustra cross direto/indireto
-    ("GBP", "CAD", "1.8091", "1.8096"),
-    ("CHF", "CAD", "1.7029", "1.7035"),
-    ("CAD", "SEK", "6.5499", "6.5533"),
-]
-EXEMPLOS_ARBITRAGEM = [  # Ex. 17 — triângulo GBP/JPY/EUR com arbitragem
-    ("GBP", "JPY", "212.646", "212.689"),
-    ("EUR", "JPY", "183.618", "183.646"),
-    ("GBP", "EUR", "1.1559", "1.1561"),
-]
-EXEMPLOS_GEOGRAFICA = [  # Ex. 15 — EUR/USD em duas praças
-    ("EUR", "USD", "1.1574", "1.1576", "Paris"),
-    ("EUR", "USD", "1.1583", "1.1585", "Londres"),
-]
-EXEMPLOS_FORWARD_SPOT = ("CHF", "USD", "1.2745", "1.2748")  # Ex. 27 (spot)
-# Forward CHF/USD a 180d + forward de mercado 1,3076–1,3079 (tem arbitragem):
-EXEMPLO_FORWARD_INPUT = "CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079"
 
 INTRO = (
     "[b]Cross-rates & arbitragem[/b] — bid/ask. Notação [b]BASE/COTADA[/b]: a "
@@ -325,8 +310,7 @@ class CrossRatesApp(App):
         montante = self._le_montante()
         if montante is False:  # entrada inválida
             return
-        geograficas = arbitragens_geograficas(self.grafo)
-        triangulares = arbitragens_triangulares(self.grafo)
+        geograficas, triangulares = analisar_arbitragem(self.grafo)
         self._mostrar_arbitragem(geograficas, triangulares, montante)
 
     def action_salvar_cenario(self) -> None:
@@ -396,128 +380,42 @@ class CrossRatesApp(App):
         self._info(f"Cotação adicionada: {cotacao}")
 
     def _tratar_calculo(self, texto: str) -> None:
-        partes = texto.upper().split()
-        if len(partes) != 2:
-            self._erro("Formato esperado: BASE COTADA (ex.: GBP SEK).")
-            return
         try:
-            r = cross(self.grafo, partes[0], partes[1])
+            r = calcular_cross(self.grafo, texto)
         except (SemPercurso, CotacaoInvalida) as exc:
             self._erro(str(exc))
             return
         self._mostrar_resultado(r)
 
     def _tratar_forward(self, texto: str) -> None:
-        partes = texto.replace(",", ".").split()
-        if len(partes) not in (7, 9):
-            self._erro_forward(
-                "Formato: BASE COTADA dias i_base_bid i_base_ask i_cot_bid "
-                "i_cot_ask [fwd_bid fwd_ask]."
-            )
-            return
-        base, cotada, dias = partes[0], partes[1], partes[2]
-        spot = self._spot_para(base, cotada)
-        if spot is None:
-            self._erro_forward(
-                f"Sem spot {base.upper()}/{cotada.upper()} na tabela — adicione a "
-                "cotação à vista primeiro."
-            )
-            return
         try:
-            n = int(dias)
-            juro_base = TaxaJuro.de_moeda(base, partes[3], partes[4])
-            juro_cotada = TaxaJuro.de_moeda(cotada, partes[5], partes[6])
-            r = forward(spot, juro_base, juro_cotada, n)
-            arb = None
-            if len(partes) == 9:
-                arb = arbitragem_a_prazo(
-                    spot, juro_base, juro_cotada, n, partes[7], partes[8]
-                )
-        except (CotacaoInvalida, ValueError) as exc:
+            r, arb = calcular_forward(self.grafo, texto)
+        except (CotacaoInvalida, SemPercurso) as exc:
             self._erro_forward(str(exc))
             return
         self._mostrar_forward(r, arb)
 
     def _tratar_swap(self, texto: str) -> None:
-        partes = texto.replace(",", ".").split()
-        if len(partes) not in (4, 5):
-            self._erro_swap("Formato: BASE COTADA pontos_bid pontos_ask [casas_decimais].")
-            return
-        base, cotada = partes[0], partes[1]
-        spot = self._spot_para(base, cotada)
-        if spot is None:
-            self._erro_swap(f"Sem spot {base.upper()}/{cotada.upper()} na tabela.")
-            return
-        
-        casas = 4
-        if len(partes) == 5:
-            try:
-                casas = int(partes[4])
-            except ValueError:
-                self._erro_swap("As casas decimais devem ser um número inteiro (ex: 4).")
-                return
-
         try:
-            r = outright_de_pontos(spot, partes[2], partes[3], casas_decimais_pontos=casas)
-        except CotacaoInvalida as exc:
+            r = calcular_swap(self.grafo, texto)
+        except (CotacaoInvalida, SemPercurso) as exc:
             self._erro_swap(str(exc))
             return
-            
         self._mostrar_swap(r)
 
     def _tratar_hedge(self, texto: str) -> None:
-        partes = texto.replace(",", ".").split()
-        if len(partes) != 9:
-            self._erro_hedge(
-                "Formato: TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a)."
-            )
-            return
-            
-        tipo = partes[0].lower()
-        if tipo not in ("recebimento", "pagamento"):
-            self._erro_hedge("TIPO deve ser 'recebimento' ou 'pagamento'.")
-            return
-            
-        montante = partes[1]
-        base, cotada, dias = partes[2], partes[3], partes[4]
-        spot = self._spot_para(base, cotada)
-        if spot is None:
-            self._erro_hedge(f"Sem spot {base.upper()}/{cotada.upper()} na tabela.")
-            return
-
         try:
-            n = int(dias)
-            juro_base = TaxaJuro.de_moeda(base, partes[5], partes[6])
-            juro_cotada = TaxaJuro.de_moeda(cotada, partes[7], partes[8])
-            r = analisa_hedging(tipo, montante, spot, juro_base, juro_cotada, n)
-        except (CotacaoInvalida, ValueError) as exc:
+            r = calcular_hedge(self.grafo, texto)
+        except (CotacaoInvalida, SemPercurso) as exc:
             self._erro_hedge(str(exc))
             return
-            
         self._mostrar_hedge(r)
-
-    def _spot_para(self, base: str, cotada: str) -> Cotacao | None:
-        """Spot ``base/cotada`` a partir da tabela (invertendo se necessário)."""
-        c = self.grafo.cotacao_do_par(base, cotada)
-        if c is None:
-            return None
-        base, cotada = normaliza_moeda(base), normaliza_moeda(cotada)
-        if c.base == base and c.cotada == cotada:
-            return c
-        # cotação na orientação inversa: bid' = 1/ask, ask' = 1/bid
-        return Cotacao(base, cotada, Decimal(1) / c.ask, Decimal(1) / c.bid)
 
     def _le_montante(self) -> Decimal | None | bool:
         """Devolve o montante (Decimal), ``None`` se vazio, ``False`` se inválido."""
-        texto = self.query_one("#montante", Input).value.strip().replace(",", ".")
-        if not texto:
-            return None
         try:
-            valor = Decimal(texto)
-            if valor <= 0:
-                raise InvalidOperation
-            return valor
-        except InvalidOperation:
+            return parse_montante(self.query_one("#montante", Input).value)
+        except CotacaoInvalida:
             self.query_one("#arb", Static).update(
                 "[b red]Erro:[/b red] montante inválido (ex.: 1000000)."
             )

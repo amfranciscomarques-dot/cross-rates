@@ -1,0 +1,14 @@
+{# Outright via pontos de swap (espelha _mostrar_swap da TUI). #}
+<div>
+  <span class="par-grande">{{ r.par }}</span> outright (via swap) &nbsp;=&nbsp;
+  <span class="bid">{{ r.fwd_bid }}</span> – <span class="ask">{{ r.fwd_ask }}</span>
+</div>
+<div class="linha-kv">
+  <span class="k">spot</span>
+  <span>{{ r.spot_bid }} – {{ r.spot_ask }}
+    &nbsp;·&nbsp; pontos {{ r.pontos_bid }} / {{ r.pontos_ask }}
+    &nbsp; <span class="chip {{ 'prem' if r.sinal == 'prémio' else 'desc' }}">base a {{ r.sinal }}</span>
+  </span>
+</div>
+<div class="formula">{{ r.forward_formula_bid }}</div>
+<div class="formula">{{ r.forward_formula_ask }}</div>

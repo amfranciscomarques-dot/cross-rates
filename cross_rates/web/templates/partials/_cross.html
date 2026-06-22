@@ -1,0 +1,11 @@
+{# Resultado de um cross-rate (espelha _mostrar_resultado da TUI). #}
+<div>
+  <span class="par-grande">{{ r.par }}</span>
+  &nbsp;=&nbsp; <span class="bid">{{ r.bid }}</span> – <span class="ask">{{ r.ask }}</span>
+  <span class="dim">(spread {{ r.spread }})</span>
+</div>
+<div class="linha-kv"><span class="k">tipo</span><span>{{ r.tipo }}</span></div>
+<div class="linha-kv"><span class="k">percurso</span><span>{{ r.percurso }}</span></div>
+<div class="formula">{{ r.bid_formula }}</div>
+<div class="formula">{{ r.ask_formula }}</div>
+<div class="nota">{{ r.nota }}</div>

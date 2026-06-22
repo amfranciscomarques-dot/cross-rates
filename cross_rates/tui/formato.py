@@ -1,13 +1,9 @@
-"""Formatação de ``Decimal`` para apresentação na TUI."""
+"""Formatação de ``Decimal`` para a TUI.
 
-from __future__ import annotations
+Mantido por compatibilidade: ``fmt`` vive agora em ``cross_rates.servico.formato``
+(partilhado com a web). Reexporta-se aqui para não quebrar os imports da TUI.
+"""
 
-from decimal import Decimal
+from cross_rates.servico.formato import fmt
 
-
-def fmt(valor: Decimal, casas: int | None = None) -> str:
-    """Formata um ``Decimal``; com ``casas`` arredonda, senão remove zeros supérfluos."""
-    if casas is not None:
-        cota = Decimal(1).scaleb(-casas)
-        return f"{valor.quantize(cota)}"
-    return f"{valor.normalize():f}"
+__all__ = ["fmt"]
