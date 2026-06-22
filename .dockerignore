@@ -1,0 +1,23 @@
+# Mantém o contexto de build pequeno e reprodutível. O Dockerfile copia apenas
+# pyproject.toml, README.md, LICENSE e cross_rates/, mas isto evita arrastar
+# caches/artefactos mesmo que o COPY mude.
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+testes/
+*.md
+!README.md
+PLAN.md
+Dockerfile
+.dockerignore

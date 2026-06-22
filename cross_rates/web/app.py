@@ -50,6 +50,13 @@ templates = Jinja2Templates(directory=str(_AQUI / "templates"))
 # Por omissão não há feed — a página abre vazia, como antes.
 _FEED_ENV = "CROSS_RATES_FEED"
 
+# Host/porta do servidor, configuráveis por ambiente para correr local ou em
+# contentor sem alterar código. Local liga em loopback; num contentor define-se
+# CROSS_RATES_HOST=0.0.0.0. A porta aceita CROSS_RATES_PORT ou o PORT genérico
+# que vários PaaS injetam.
+_HOST_ENV = "CROSS_RATES_HOST"
+_PORT_ENV = "CROSS_RATES_PORT"
+
 app = FastAPI(title="Cross-Rates", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(_AQUI / "static")), name="static")
 
@@ -235,7 +242,14 @@ def hedge(request: Request, hedge: Texto, cotacoes: Cotacoes = []) -> HTMLRespon
 
 
 def serve() -> None:
-    """Entry-point ``cross-rates-web``: arranca o uvicorn em 127.0.0.1:8000."""
+    """Entry-point ``cross-rates-web``: arranca o uvicorn.
+
+    Host e porta vêm do ambiente (com defaults locais), para o mesmo binário
+    correr em ``127.0.0.1:8000`` no posto de trabalho e em ``0.0.0.0:$PORT``
+    dentro de um contentor — sem ramos de código específicos do alojamento.
+    """
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    host = os.environ.get(_HOST_ENV, "127.0.0.1")
+    port = int(os.environ.get(_PORT_ENV) or os.environ.get("PORT") or "8000")
+    uvicorn.run(app, host=host, port=port)

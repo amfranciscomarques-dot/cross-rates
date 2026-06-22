@@ -200,7 +200,23 @@ def test_serve_arranca_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(uvicorn, "run", _fake_run)
     serve()
     assert chamado["app"] is fastapi_app
+    assert chamado["kwargs"]["host"] == "127.0.0.1"
     assert chamado["kwargs"]["port"] == 8000
+
+
+def test_serve_respeita_host_e_porta_do_ambiente(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Em contentor, CROSS_RATES_HOST/PORT sobrepõem-se aos defaults locais."""
+    import uvicorn
+
+    from cross_rates.web.app import serve
+
+    monkeypatch.setenv("CROSS_RATES_HOST", "0.0.0.0")
+    monkeypatch.setenv("CROSS_RATES_PORT", "9000")
+    chamado: dict[str, object] = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app_obj, **kw: chamado.update(kw))
+    serve()
+    assert chamado["host"] == "0.0.0.0"
+    assert chamado["port"] == 9000
 
 
 def test_modulo_main_invoca_a_tui(monkeypatch: pytest.MonkeyPatch) -> None:

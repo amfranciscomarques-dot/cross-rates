@@ -30,9 +30,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   with live data instead of an empty table. Unset by default. Degrades
   gracefully (empty table + note) if the feed is unavailable.
 
+**Containerisation (`Dockerfile`)**
+
+- Multi-stage `Dockerfile` for the web UI: a builder stage installs the package
+  with the `web` extra into an isolated virtualenv, copied into a slim,
+  non-root runtime image. Host-agnostic — no provider-specific config.
+- `serve()` now reads host/port from the environment (`CROSS_RATES_HOST`,
+  `CROSS_RATES_PORT`, falling back to the generic `PORT`), defaulting to
+  `127.0.0.1:8000` locally. The container binds `0.0.0.0` and seeds from the
+  live feed (`CROSS_RATES_FEED=frankfurter`) via image defaults.
+- `DEPLOYMENT.md` documents building and running the container.
+
 **Quality**
 
 - `mypy --strict` and the 100% line-coverage gate now extend to `feeds/`.
+- CI now installs the `web` extra (so the web tests actually run) and builds +
+  smoke-tests the Docker image on every push/PR (build only, no deploy).
 
 ---
 
