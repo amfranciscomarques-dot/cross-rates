@@ -27,8 +27,8 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Type-check core (mypy --strict)
-        run: mypy cross_rates/nucleo
+      - name: Type-check core + service + feeds (mypy --strict)
+        run: mypy
 
       - name: Tests (pytest + coverage)
         run: pytest

@@ -31,6 +31,38 @@ def test_index_carrega(cliente: TestClient) -> None:
     assert 'id="tabela"' in r.text
 
 
+def test_index_semeado_pelo_feed(cliente: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Com CROSS_RATES_FEED=simulado, a página abre já com cotações na tabela."""
+    monkeypatch.setenv("CROSS_RATES_FEED", "simulado")
+    r = cliente.get("/")
+    assert r.status_code == 200
+    assert "EUR/USD" in r.text
+    assert _cotacoes(r.text)  # estado oculto pré-preenchido
+    assert "carregadas do feed" in r.text
+
+
+def test_index_feed_indisponivel_abre_vazio(
+    cliente: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Se o feed falhar, a página degrada graciosamente: tabela vazia + nota."""
+    import sys
+
+    from cross_rates.feeds import FeedIndisponivel
+
+    class _FeedAvariado:
+        def cotacoes(self) -> list[object]:
+            raise FeedIndisponivel("rede em baixo")
+
+    # O módulo, via sys.modules: o nome `cross_rates.web.app` colide com a
+    # instância FastAPI reexportada em cross_rates.web.__init__.
+    web_app = sys.modules["cross_rates.web.app"]
+    monkeypatch.setattr(web_app, "_feed_configurado", lambda: _FeedAvariado())
+    r = cliente.get("/")
+    assert r.status_code == 200
+    assert _cotacoes(r.text) == []
+    assert "indisponível" in r.text
+
+
 def test_exemplos_devolvem_estado_oculto(cliente: TestClient) -> None:
     r = cliente.post("/exemplos/arbitragem", data={"cotacoes": []})
     assert r.status_code == 200

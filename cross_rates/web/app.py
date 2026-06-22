@@ -9,14 +9,16 @@ Os erros de input (``CotacaoInvalida``/``SemPercurso``) viram o parcial ``_erro`
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from cross_rates.feeds import FeedError, FonteCotacoes, feed_por_nome
 from cross_rates.nucleo import Cotacao, CotacaoInvalida, GrafoCambial, SemPercurso
 from cross_rates.servico import (
     EXEMPLO_FORWARD_INPUT,
@@ -42,6 +44,11 @@ from cross_rates.servico.serial import (
 
 _AQUI = Path(__file__).parent
 templates = Jinja2Templates(directory=str(_AQUI / "templates"))
+
+# Feed que semeia a tabela no arranque (GET /), escolhido por configuração:
+# CROSS_RATES_FEED = "frankfurter" (ao vivo) | "simulado" (offline) | "none".
+# Por omissão não há feed — a página abre vazia, como antes.
+_FEED_ENV = "CROSS_RATES_FEED"
 
 app = FastAPI(title="Cross-Rates", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(_AQUI / "static")), name="static")
@@ -74,14 +81,41 @@ def _grafo(cotacoes: list[str]) -> GrafoCambial:
     return grafo
 
 
+def _linhas(grafo: GrafoCambial) -> list[dict[str, Any]]:
+    """View-model das linhas: par formatado (visível) + texto canónico (estado)."""
+    return [{"d": cotacao_dict(c), "raw": _raw(c)} for c in grafo.cotacoes]
+
+
 def _tabela(request: Request, grafo: GrafoCambial, msg: str = "") -> HTMLResponse:
     """Renderiza o parcial da tabela (linhas visíveis + estado oculto)."""
-    linhas = [{"d": cotacao_dict(c), "raw": _raw(c)} for c in grafo.cotacoes]
     return templates.TemplateResponse(
         request,
         "partials/_tabela.html",
-        {"linhas": linhas, "msg": msg},
+        {"linhas": _linhas(grafo), "msg": msg},
     )
+
+
+def _feed_configurado() -> FonteCotacoes | None:
+    """Feed escolhido por ``CROSS_RATES_FEED`` (ou ``None`` se não configurado)."""
+    return feed_por_nome(os.environ.get(_FEED_ENV))
+
+
+def _grafo_inicial() -> tuple[GrafoCambial, str]:
+    """Grafo de arranque: semeado pelo feed se houver, vazio caso contrário.
+
+    Degradação graciosa: se o feed falhar (rede/dados), a página abre vazia com
+    uma nota em vez de devolver erro.
+    """
+    grafo = GrafoCambial()
+    feed = _feed_configurado()
+    if feed is None:
+        return grafo, ""
+    try:
+        for c in feed.cotacoes():
+            grafo.adicionar(c)
+    except FeedError as exc:
+        return GrafoCambial(), f"Feed indisponível ({exc}); tabela vazia."
+    return grafo, f"{len(grafo.cotacoes)} cotações carregadas do feed."
 
 
 def _erro(request: Request, alvo: str, msg: str) -> HTMLResponse:
@@ -93,10 +127,11 @@ def _erro(request: Request, alvo: str, msg: str) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
+    grafo, msg = _grafo_inicial()
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"exemplo_forward": EXEMPLO_FORWARD_INPUT, "linhas": [], "msg": ""},
+        {"exemplo_forward": EXEMPLO_FORWARD_INPUT, "linhas": _linhas(grafo), "msg": msg},
     )
 
 

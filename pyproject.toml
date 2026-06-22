@@ -78,8 +78,8 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.11"
 strict = true
 warn_unused_ignores = true
-# We hold the financial core AND the framework-agnostic service layer to a
-# strict bar. The UI layers (Textual TUI and the FastAPI/Jinja web frontend)
-# lean on dynamically-typed framework APIs where strict checking is mostly
-# noise, so they are intentionally outside the type-checked surface.
-files = ["cross_rates/nucleo", "cross_rates/servico"]
+# We hold the financial core, the framework-agnostic service layer AND the
+# price feeds to a strict bar. The UI layers (Textual TUI and the FastAPI/Jinja
+# web frontend) lean on dynamically-typed framework APIs where strict checking
+# is mostly noise, so they are intentionally outside the type-checked surface.
+files = ["cross_rates/nucleo", "cross_rates/servico", "cross_rates/feeds"]
