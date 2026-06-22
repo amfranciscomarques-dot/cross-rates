@@ -50,6 +50,27 @@ async def test_forward_na_tui():
 
 
 @pytest.mark.asyncio
+async def test_hedge_com_opcao_na_tui():
+    app = CrossRatesApp()
+    async with app.run_test() as pilot:
+        from cross_rates.nucleo import Cotacao
+
+        app._adicionar_cotacao(Cotacao("EUR", "USD", "1.0990", "1.1010"))
+        await pilot.pause()
+
+        campo = app.query_one("#hedge")
+        campo.focus()
+        await pilot.pause()
+        campo.value = "pagamento 1000000 EUR USD 180 2.9 3.1 4.9 5.1 1.1000 10"
+        await pilot.press("enter")
+        await pilot.pause()
+
+        conteudo = str(app.query_one("#hedge_res").render())
+        assert "opção" in conteudo.lower()  # terceira estratégia presente
+        assert "máximo" in conteudo.lower()
+
+
+@pytest.mark.asyncio
 async def test_opcao_na_tui():
     app = CrossRatesApp()
     async with app.run_test() as pilot:

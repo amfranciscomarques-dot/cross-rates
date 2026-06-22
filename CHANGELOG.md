@@ -45,6 +45,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the view-model serialises it; exposed in both UIs (`/opcao` web route + a new
   TUI panel, key `k`).
 
+**Option hedge (`nucleo/hedging.py`)**
+
+- `analisa_hedging()` gains optional `opcao_strike` and `vol` arguments. When
+  both are given it adds a third, **contingent** strategy: a payment buys a
+  *put* on the base, a receipt a *call*, sized at `montante / strike` of base so
+  exercise converts the exposure exactly. It fixes a worst case — maximum cost
+  (payment) or minimum proceeds (receipt) — while keeping the favourable side.
+- The premium is priced with Garman-Kohlhagen and financed to maturity at the
+  base rate. New `AnaliseHedging` fields (`opcao_tipo`, `opcao_strike`,
+  `opcao_notional`, `opcao_premio_cotada`, `opcao_premio_base`,
+  `opcao_resultado_base`) are `None` when no option is requested, so the change
+  is fully backward-compatible.
+- Non-breaking by design: the option is contingent and **does not enter**
+  `melhor_estrategia` (still a forward-vs-MMH choice). The exercise leg is exact;
+  the option leg is valued at mid and labelled as such, leaving the exact
+  bid/ask forward and MMH rows untouched. Surfaced in both UIs (web `_hedge`
+  partial + TUI hedge panel) via an optional `[strike vol]` on the input.
+
 **Containerisation (`Dockerfile`)**
 
 - Multi-stage `Dockerfile` for the web UI: a builder stage installs the package

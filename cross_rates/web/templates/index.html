@@ -113,8 +113,9 @@
       <section class="painel">
         <h2>Hedging (cobertura de risco)</h2>
         <p class="dica">
-          TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a). TIPO =
-          recebimento | pagamento. A moeda estrangeira é sempre a COTADA.
+          TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a) [strike vol].
+          TIPO = recebimento | pagamento. A moeda estrangeira é sempre a COTADA.
+          Com strike e vol (% anual) acrescenta a cobertura com opção (GK).
         </p>
         <form class="linha" hx-post="/hedge" hx-target="#hedge_res" hx-include="#tabela">
           <input type="text" name="hedge" placeholder="ex.: pagamento 500000 EUR USD 90 3.1 3.2 4.5 4.6" autocomplete="off">

@@ -13,6 +13,19 @@
 <div class="formula">2. Conversão spot ({{ r.mmh_spot_taxa }}): {{ r.mmh_base_presente }} {{ r.moeda_base }}</div>
 <div class="formula">3. Valor futuro: <span class="bid">{{ r.mmh_resultado_base }} {{ r.moeda_base }}</span></div>
 
+{% if r.opcao_resultado_base %}
+<h3>Cobertura com opção (Garman-Kohlhagen)</h3>
+<div>
+  Compra de <b>{{ r.opcao_tipo|upper }}</b> sobre {{ r.moeda_base }} · strike
+  {{ r.opcao_strike }} · notional {{ r.opcao_notional }} {{ r.moeda_base }}
+</div>
+<div class="linha-kv"><span class="k">Prémio (capitalizado)</span><span>{{ r.opcao_premio_base }} {{ r.moeda_base }}</span></div>
+<div class="linha-kv"><span class="k">{{ r.opcao_acao }} coberto</span><span class="bid">{{ r.opcao_resultado_base }} {{ r.moeda_base }}</span></div>
+<div class="nota">Contingente: fixa o pior caso e mantém o lado favorável, por isso
+não entra na escolha abaixo (avaliada a mid).</div>
+{% endif %}
+
 <div style="margin-top:12px">
   <b>Melhor estratégia:</b> <span class="melhor">{{ r.melhor_estrategia }}</span>
+  <span class="dim">(Forward vs Money Market)</span>
 </div>

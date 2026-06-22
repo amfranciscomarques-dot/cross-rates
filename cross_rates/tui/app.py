@@ -261,9 +261,10 @@ class CrossRatesApp(App):
 
                 yield Label("Hedging (Cobertura de Risco)", classes="rotulo")
                 yield Static(
-                    "TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a). "
-                    "TIPO = recebimento | pagamento. "
-                    "A Moeda Estrangeira será sempre a COTADA.",
+                    "TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a) "
+                    "[strike vol]. TIPO = recebimento | pagamento. A Moeda "
+                    "Estrangeira será sempre a COTADA. Com strike e vol (% anual) "
+                    "acrescenta a cobertura com opção (GK).",
                     classes="dica",
                 )
                 yield Input(
@@ -605,8 +606,23 @@ class CrossRatesApp(App):
             f"  2. Conversão spot ({_fmt(r.mmh_spot_taxa, 6)}): "
             f"{_fmt(r.mmh_base_presente, 2)} {r.moeda_base}",
             f"  3. Valor futuro: [green]{_fmt(r.mmh_resultado_base, 2)} {r.moeda_base}[/green]",
+        ]
+        if r.opcao_resultado_base is not None:
+            rotulo = "Custo máximo" if r.tipo_exposicao == "pagamento" else "Receita mínima"
+            linhas += [
+                "",
+                "[b u]Cobertura com opção (Garman-Kohlhagen)[/b u]",
+                f"  Compra de [b]{(r.opcao_tipo or '').upper()}[/b] sobre {r.moeda_base} · "
+                f"strike {_fmt(r.opcao_strike, 6)} · notional "
+                f"{_fmt(r.opcao_notional, 2)} {r.moeda_base}",
+                f"  Prémio (capitalizado): {_fmt(r.opcao_premio_base, 2)} {r.moeda_base}",
+                f"  {rotulo} coberto: [green]{_fmt(r.opcao_resultado_base, 2)} "
+                f"{r.moeda_base}[/green]  [dim](contingente — mantém o lado favorável)[/dim]",
+            ]
+        linhas += [
             "",
-            f"[b]Melhor estratégia:[/b] [bold magenta]{r.melhor_estrategia}[/bold magenta]",
+            f"[b]Melhor estratégia:[/b] [bold magenta]{r.melhor_estrategia}[/bold magenta] "
+            "[dim](Forward vs Money Market)[/dim]",
         ]
         self.query_one("#hedge_res", Static).update("\n".join(linhas))
 

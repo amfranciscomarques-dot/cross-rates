@@ -175,13 +175,16 @@ def calcular_opcao(grafo: GrafoCambial, texto: str) -> ResultadoOpcao:
 def calcular_hedge(grafo: GrafoCambial, texto: str) -> AnaliseHedging:
     """Analisa a cobertura (Forward Hedge vs Money Market Hedge).
 
-    Formato: ``TIPO MONTANTE BASE COTADA dias i_base_bid i_base_ask i_cot_bid i_cot_ask``,
-    com ``TIPO`` = ``recebimento`` | ``pagamento``. Spot da tabela.
+    Formato: ``TIPO MONTANTE BASE COTADA dias i_base_bid i_base_ask i_cot_bid
+    i_cot_ask [strike vol]``, com ``TIPO`` = ``recebimento`` | ``pagamento``.
+    Com ``strike`` e ``vol`` (% anual) acrescenta a cobertura com opção (GK).
+    Spot da tabela.
     """
     partes = texto.replace(",", ".").split()
-    if len(partes) != 9:
+    if len(partes) not in (9, 11):
         raise CotacaoInvalida(
-            "Formato: TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a)."
+            "Formato: TIPO MONTANTE BASE COTADA dias i_base(b a) i_cotada(b a) "
+            "[strike vol]."
         )
     tipo = partes[0].lower()
     if tipo not in ("recebimento", "pagamento"):
@@ -191,4 +194,6 @@ def calcular_hedge(grafo: GrafoCambial, texto: str) -> AnaliseHedging:
     n = _inteiro(partes[4], "O prazo (dias)")
     juro_base = TaxaJuro.de_moeda(base, partes[5], partes[6])
     juro_cotada = TaxaJuro.de_moeda(cotada, partes[7], partes[8])
-    return analisa_hedging(tipo, montante, spot, juro_base, juro_cotada, n)
+    strike = para_decimal(partes[9]) if len(partes) == 11 else None
+    vol = para_decimal(partes[10]) if len(partes) == 11 else None
+    return analisa_hedging(tipo, montante, spot, juro_base, juro_cotada, n, strike, vol)

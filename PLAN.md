@@ -56,9 +56,16 @@ new code; the work is infrastructure.
 **Dependency:** Phase 1 (the live feed makes the deployed demo non-trivial to
 use; without it the demo opens to an empty table).
 
+**Progress:** container image (`Dockerfile`) + `DEPLOYMENT.md` shipped; CI builds
+and smoke-tests the image. As an interim stand-in for the live URL, the README
+now embeds web-UI screenshots (`docs/screenshots/`) captured against the app
+running on the live Frankfurter feed — hero (seeded table), a cross-rate, and
+the hedging panel with the option hedge. **Still open:** `fly.toml` (or another
+host), a CI deploy step, and a clickable live URL in the README.
+
 ---
 
-## Phase 3 — FX options (Garman-Kohlhagen)
+## Phase 3 — FX options (Garman-Kohlhagen) ✅ shipped
 
 **Goal:** extend the hedging module with vanilla FX option pricing and basic
 Greeks, completing the "full exposure lifecycle" story.
@@ -81,6 +88,16 @@ the stochastic layer on top of the deterministic CIP model already built.
 - Expose in both UIs: new `/opcao` route in the web UI; new panel in the TUI.
 
 **Dependency:** none (purely additive to `nucleo/`).
+
+**Delivered:** `garman_kohlhagen()` + Greeks, the `/opcao` web route and the TUI
+options panel (key `k`). The option hedge is wired into `analisa_hedging` via
+optional `opcao_strike`/`vol` — a Madura-style contingent strategy fixing the
+maximum cost (put on the base, payment) or minimum proceeds (call, receipt).
+Design choice: it is **contingent**, so it does not re-rank `melhor_estrategia`
+(still forward-vs-MMH). The exercise leg `montante / strike` is exact; the
+option leg is mid-based (the GK price is itself a mid) and labelled as such, so
+the existing exact bid/ask forward and MMH rows are unaffected and the change
+is backward-compatible (new fields default to `None`).
 
 ---
 

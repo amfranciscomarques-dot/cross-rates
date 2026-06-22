@@ -151,7 +151,7 @@ def swap_dict(r: SwapOutright) -> dict[str, str]:
 
 
 def hedge_dict(r: AnaliseHedging) -> dict[str, str]:
-    return {
+    d = {
         "tipo_exposicao": r.tipo_exposicao,
         "moeda_estrangeira": r.moeda_estrangeira,
         "moeda_base": r.moeda_base,
@@ -167,6 +167,17 @@ def hedge_dict(r: AnaliseHedging) -> dict[str, str]:
         "mmh_resultado_base": fmt(r.mmh_resultado_base, 2),
         "melhor_estrategia": r.melhor_estrategia,
     }
+    if r.opcao_resultado_base is not None:
+        # mypy: presença de opcao_resultado_base garante os restantes campos.
+        assert r.opcao_strike is not None and r.opcao_notional is not None
+        assert r.opcao_premio_base is not None
+        d["opcao_tipo"] = r.opcao_tipo or ""
+        d["opcao_strike"] = fmt(r.opcao_strike, 6)
+        d["opcao_notional"] = fmt(r.opcao_notional, 2)
+        d["opcao_premio_base"] = fmt(r.opcao_premio_base, 2)
+        d["opcao_resultado_base"] = fmt(r.opcao_resultado_base, 2)
+        d["opcao_acao"] = "Custo máximo" if r.tipo_exposicao == "pagamento" else "Receita mínima"
+    return d
 
 
 def opcao_dict(r: ResultadoOpcao) -> dict[str, str]:

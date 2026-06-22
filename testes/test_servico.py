@@ -151,6 +151,15 @@ def test_hedge_tipo_invalido() -> None:
         calcular_hedge(g, "compra 500000 EUR USD 90 3.1 3.2 4.5 4.6")
 
 
+def test_hedge_com_opcao_11_campos() -> None:
+    g = _grafo(("EUR", "USD", "1.0990", "1.1010"))
+    r = calcular_hedge(g, "pagamento 1000000 EUR USD 180 2.9 3.1 4.9 5.1 1.1000 10")
+    d = para_dict(r)
+    assert d["opcao_tipo"] == "put"
+    assert d["opcao_acao"] == "Custo máximo"
+    assert Decimal(d["opcao_resultado_base"]) > 0
+
+
 # --- opção (Garman-Kohlhagen) ---------------------------------------------- #
 
 

@@ -171,6 +171,19 @@ def test_swap_e_hedge(cliente: TestClient) -> None:
     assert "Melhor estratégia" in r.text
 
 
+def test_hedge_com_opcao(cliente: TestClient) -> None:
+    cots = ["EUR USD 1.0990 1.1010"]
+    r = cliente.post(
+        "/hedge",
+        data={
+            "hedge": "pagamento 1000000 EUR USD 180 2.9 3.1 4.9 5.1 1.1000 10",
+            "cotacoes": cots,
+        },
+    )
+    assert r.status_code == 200
+    assert "Cobertura com opção" in r.text  # secção da terceira estratégia
+
+
 # --- ramos de erro de cada operação ---------------------------------------- #
 
 

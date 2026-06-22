@@ -212,3 +212,51 @@ def test_aceita_entrada_numerica(eur_usd_90d):
     r_int = analisa_hedging("pagamento", 1000000, spot, juro_base, juro_me, 90)
     r_str = analisa_hedging("pagamento", "1000000", spot, juro_base, juro_me, 90)
     assert r_int.fwd_resultado_base == r_str.fwd_resultado_base
+
+
+# --------------------------------------------------------------------------- #
+# Terceira estratégia: cobertura com opção (Garman-Kohlhagen)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def eur_usd_180d():
+    """EUR/USD 180d, spot mid 1.10, r_f(EUR)=3%, r_d(USD)=5% — para opções."""
+    spot = Cotacao("EUR", "USD", "1.0990", "1.1010")
+    return spot, TaxaJuro("EUR", "2.9", "3.1"), TaxaJuro("USD", "4.9", "5.1")
+
+
+def test_opcao_pagamento_put_custo_maximo(eur_usd_180d):
+    spot, jb, jc = eur_usd_180d
+    r = analisa_hedging("pagamento", 1_000_000, spot, jb, jc, 180, "1.1000", "10")
+    assert r.opcao_tipo == "put"  # pagamento → put sobre a base
+    assert r.opcao_notional == Decimal(1_000_000) / Decimal("1.1")  # = montante/strike (EUR)
+    assert proximo(r.opcao_premio_base, "21128.77")
+    assert proximo(r.opcao_resultado_base, "930219.68")  # custo máximo coberto
+    # A opção custa mais que o forward (paga-se o prémio pela opcionalidade)…
+    assert r.opcao_resultado_base > r.fwd_resultado_base
+    # … e não altera a escolha forward-vs-MMH.
+    assert r.melhor_estrategia in ("Forward Hedge", "Money Market Hedge")
+
+
+def test_opcao_recebimento_call_receita_minima(eur_usd_180d):
+    spot, jb, jc = eur_usd_180d
+    r = analisa_hedging("recebimento", 1_000_000, spot, jb, jc, 180, "1.1000", "10")
+    assert r.opcao_tipo == "call"  # recebimento → call sobre a base
+    assert proximo(r.opcao_resultado_base, "879038.99")  # receita mínima garantida
+    assert r.opcao_resultado_base < r.fwd_resultado_base  # piso abaixo do forward
+
+
+def test_opcao_so_com_strike_e_vol(eur_usd_180d):
+    spot, jb, jc = eur_usd_180d
+    # Sem opção (omissão): campos a None, comportamento anterior intacto.
+    assert analisa_hedging("pagamento", 1_000_000, spot, jb, jc, 180).opcao_resultado_base is None
+    # Só strike (sem vol) também não ativa a opção.
+    so_strike = analisa_hedging("pagamento", 1_000_000, spot, jb, jc, 180, "1.1", None)
+    assert so_strike.opcao_resultado_base is None
+
+
+def test_opcao_strike_invalido(eur_usd_180d):
+    spot, jb, jc = eur_usd_180d
+    with pytest.raises(CotacaoInvalida):
+        analisa_hedging("pagamento", 1_000_000, spot, jb, jc, 180, "0", "10")
