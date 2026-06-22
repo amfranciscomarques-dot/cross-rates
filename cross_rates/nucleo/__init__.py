@@ -24,6 +24,7 @@ from .forward import (
 )
 from .grafo import GrafoCambial, SemPercurso
 from .hedging import AnaliseHedging, analisa_hedging
+from .opcoes import OpcaoVanilla, ResultadoOpcao, TipoOpcao, garman_kohlhagen
 from .swaps import SwapOutright, outright_de_pontos
 
 __all__ = [
@@ -52,4 +53,8 @@ __all__ = [
     "outright_de_pontos",
     "AnaliseHedging",
     "analisa_hedging",
+    "OpcaoVanilla",
+    "ResultadoOpcao",
+    "TipoOpcao",
+    "garman_kohlhagen",
 ]

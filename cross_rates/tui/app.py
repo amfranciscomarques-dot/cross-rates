@@ -29,14 +29,17 @@ from cross_rates.nucleo import (
 )
 from cross_rates.servico import (
     EXEMPLO_FORWARD_INPUT,
+    EXEMPLO_OPCAO_INPUT,
     EXEMPLOS_ARBITRAGEM,
     EXEMPLOS_CROSS,
     EXEMPLOS_FORWARD_SPOT,
     EXEMPLOS_GEOGRAFICA,
+    EXEMPLOS_OPCAO_SPOT,
     analisar_arbitragem,
     calcular_cross,
     calcular_forward,
     calcular_hedge,
+    calcular_opcao,
     calcular_swap,
     parse_montante,
 )
@@ -112,6 +115,15 @@ equilíbrio, vende-se o que está caro e replica-se via MMI o que está barato.
 Cada cotação BASE/COTADA gera duas conversões dirigidas:
   BASE→COTADA à taxa bid   ;   COTADA→BASE à taxa 1/ask.
 bid do cross = taxa do percurso BASE→…→COTADA; ask = 1/(taxa COTADA→…→BASE).
+
+[b]8. Opções cambiais (Garman-Kohlhagen)[/b]
+Opção vanilla sobre BASE/COTADA: a BASE é o ativo (rende r_f), a COTADA o
+numerário (rende r_d). Black-Scholes adaptado a divisas:
+     call = S·e^(−r_f·T)·N(d1) − K·e^(−r_d·T)·N(d2)
+     d1 = [ln(S/K) + (r_d − r_f + σ²/2)·T] / (σ·√T) ; d2 = d1 − σ·√T
+Prémio em COTADA por 1 BASE. [b]Gregas:[/b] delta (spot), gamma (delta), vega
+(vol), theta (tempo), rho (taxa doméstica). Paridade put-call:
+     C − P = S·e^(−r_f·T) − K·e^(−r_d·T).
 """
 
 
@@ -147,7 +159,7 @@ class CrossRatesApp(App):
     #corpo { height: 1fr; }
     #esquerda { width: 3fr; padding: 0 1; }
     #direita { width: 2fr; padding: 0 1; border-left: solid $accent; }
-    #resultado, #arb, #forward_res, #swap_res, #hedge_res {
+    #resultado, #arb, #forward_res, #swap_res, #hedge_res, #opcao_res {
         height: auto; padding: 1; border: round $accent; margin: 1 0;
     }
     #teoria { padding: 1; }
@@ -173,6 +185,7 @@ class CrossRatesApp(App):
         ("x", "exemplos_arbitragem", "Ex. triangular"),
         ("g", "exemplos_geografica", "Ex. geográfica"),
         ("f", "exemplos_forward", "Ex. forward"),
+        ("k", "exemplos_opcao", "Ex. opção"),
         ("l", "limpar", "Limpar"),
         ("s", "salvar_cenario", "Salvar Cenário"),
         ("o", "abrir_cenario", "Abrir Cenário"),
@@ -258,6 +271,20 @@ class CrossRatesApp(App):
                     id="hedge",
                 )
                 yield Static("Sem análise de hedging ainda.", id="hedge_res")
+
+                yield Label("Opções cambiais (Garman-Kohlhagen)  [tecla k]", classes="rotulo")
+                yield Static(
+                    "TIPO BASE COTADA strike dias vol i_base(b a) i_cotada(b a) "
+                    "[notional]. TIPO = call | put; vol em % anual; o spot vem da "
+                    "tabela. Prémio em COTADA por 1 BASE, com delta/gamma/vega/"
+                    "theta/rho.",
+                    classes="dica",
+                )
+                yield Input(
+                    placeholder="ex.: call EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1 1000000",
+                    id="opcao",
+                )
+                yield Static("Sem avaliação de opção ainda.", id="opcao_res")
             with VerticalScroll(id="direita"):
                 yield Static(TEORIA, id="teoria")
         yield Footer()
@@ -297,6 +324,14 @@ class CrossRatesApp(App):
             "Exemplo de forward carregado (Ex. 27): spot CHF/USD na tabela e o "
             "input preenchido com juros e forward de mercado. Prima Enter no "
             "campo de forward (tem arbitragem a prazo)."
+        )
+
+    def action_exemplos_opcao(self) -> None:
+        self._adicionar_cotacao(Cotacao(*EXEMPLOS_OPCAO_SPOT))
+        self.query_one("#opcao", Input).value = EXEMPLO_OPCAO_INPUT
+        self._info(
+            "Exemplo de opção carregado: spot EUR/USD na tabela e o input "
+            "preenchido (call ATM 180d, vol 10%). Prima Enter no campo de opção."
         )
 
     def action_pratica(self) -> None:
@@ -368,6 +403,8 @@ class CrossRatesApp(App):
             self._tratar_swap(texto)
         elif evento.input.id == "hedge" and texto:
             self._tratar_hedge(texto)
+        elif evento.input.id == "opcao" and texto:
+            self._tratar_opcao(texto)
 
     def _tratar_adicao(self, texto: str, campo: Input) -> None:
         try:
@@ -410,6 +447,14 @@ class CrossRatesApp(App):
             self._erro_hedge(str(exc))
             return
         self._mostrar_hedge(r)
+
+    def _tratar_opcao(self, texto: str) -> None:
+        try:
+            r = calcular_opcao(self.grafo, texto)
+        except (CotacaoInvalida, SemPercurso) as exc:
+            self._erro_opcao(str(exc))
+            return
+        self._mostrar_opcao(r)
 
     def _le_montante(self) -> Decimal | None | bool:
         """Devolve o montante (Decimal), ``None`` se vazio, ``False`` se inválido."""
@@ -564,6 +609,27 @@ class CrossRatesApp(App):
             f"[b]Melhor estratégia:[/b] [bold magenta]{r.melhor_estrategia}[/bold magenta]",
         ]
         self.query_one("#hedge_res", Static).update("\n".join(linhas))
+
+    def _mostrar_opcao(self, r) -> None:
+        linhas = [
+            f"[b]{r.par} {r.tipo.upper()}[/b]  strike {_fmt(r.strike)}  "
+            f"{r.dias}d  vol {_fmt(r.vol)}%",
+            f"  prémio = [green]{_fmt(r.preco, 6)} {r.cotada}[/green] por 1 {r.base}"
+            f"    total: [green]{_fmt(r.preco_total, 2)} {r.cotada}[/green] "
+            f"({_fmt(r.notional)} {r.base})",
+            f"  spot(mid) {_fmt(r.spot, 4)}  ·  r_f({r.base})={_fmt(r.juro_base, 4)}%  "
+            f"·  r_d({r.cotada})={_fmt(r.juro_cotada, 4)}%  ·  "
+            f"d1={_fmt(r.d1, 4)}  d2={_fmt(r.d2, 4)}",
+            "[b u]Gregas[/b u]",
+            f"  delta {_fmt(r.delta, 4)}   gamma {_fmt(r.gamma, 4)}   "
+            f"vega {_fmt(r.vega, 6)} (/+1 vol pt)",
+            f"  theta {_fmt(r.theta, 6)} (/dia)   rho {_fmt(r.rho, 6)} (/+1 pt r_d)",
+            f"[i]{r.nota}[/i]",
+        ]
+        self.query_one("#opcao_res", Static).update("\n".join(linhas))
+
+    def _erro_opcao(self, msg: str) -> None:
+        self.query_one("#opcao_res", Static).update(f"[b red]Erro:[/b red] {msg}")
 
     def _erro_forward(self, msg: str) -> None:
         self.query_one("#forward_res", Static).update(f"[b red]Erro:[/b red] {msg}")

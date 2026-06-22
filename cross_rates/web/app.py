@@ -22,14 +22,17 @@ from cross_rates.feeds import FeedError, FonteCotacoes, feed_por_nome
 from cross_rates.nucleo import Cotacao, CotacaoInvalida, GrafoCambial, SemPercurso
 from cross_rates.servico import (
     EXEMPLO_FORWARD_INPUT,
+    EXEMPLO_OPCAO_INPUT,
     EXEMPLOS_ARBITRAGEM,
     EXEMPLOS_CROSS,
     EXEMPLOS_FORWARD_SPOT,
     EXEMPLOS_GEOGRAFICA,
+    EXEMPLOS_OPCAO_SPOT,
     analisar_arbitragem,
     calcular_cross,
     calcular_forward,
     calcular_hedge,
+    calcular_opcao,
     calcular_swap,
     parse_montante,
 )
@@ -66,6 +69,7 @@ _EXEMPLOS: dict[str, list[tuple[str, ...]]] = {
     "arbitragem": EXEMPLOS_ARBITRAGEM,
     "geografica": EXEMPLOS_GEOGRAFICA,
     "forward": [EXEMPLOS_FORWARD_SPOT],
+    "opcao": [EXEMPLOS_OPCAO_SPOT],
 }
 
 # Form fields reutilizados: lista de cotações (estado) e montante opcional.
@@ -138,7 +142,12 @@ def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"exemplo_forward": EXEMPLO_FORWARD_INPUT, "linhas": _linhas(grafo), "msg": msg},
+        {
+            "exemplo_forward": EXEMPLO_FORWARD_INPUT,
+            "exemplo_opcao": EXEMPLO_OPCAO_INPUT,
+            "linhas": _linhas(grafo),
+            "msg": msg,
+        },
     )
 
 
@@ -227,6 +236,17 @@ def swap(request: Request, swap: Texto, cotacoes: Cotacoes = []) -> HTMLResponse
         return _erro(request, "swap_res", str(exc))
     return templates.TemplateResponse(
         request, "partials/_swap.html", {"r": para_dict(r)}
+    )
+
+
+@app.post("/opcao", response_class=HTMLResponse)
+def opcao(request: Request, opcao: Texto, cotacoes: Cotacoes = []) -> HTMLResponse:
+    try:
+        r = calcular_opcao(_grafo(cotacoes), opcao)
+    except (SemPercurso, CotacaoInvalida) as exc:
+        return _erro(request, "opcao_res", str(exc))
+    return templates.TemplateResponse(
+        request, "partials/_opcao.html", {"r": para_dict(r)}
     )
 
 

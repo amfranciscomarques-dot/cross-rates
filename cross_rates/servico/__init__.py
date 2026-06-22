@@ -14,10 +14,12 @@ evitando duplicar lógica.
 
 from .exemplos import (
     EXEMPLO_FORWARD_INPUT,
+    EXEMPLO_OPCAO_INPUT,
     EXEMPLOS_ARBITRAGEM,
     EXEMPLOS_CROSS,
     EXEMPLOS_FORWARD_SPOT,
     EXEMPLOS_GEOGRAFICA,
+    EXEMPLOS_OPCAO_SPOT,
 )
 from .formato import fmt
 from .operacoes import (
@@ -26,6 +28,7 @@ from .operacoes import (
     calcular_cross,
     calcular_forward,
     calcular_hedge,
+    calcular_opcao,
     calcular_swap,
     parse_montante,
     spot_para,
@@ -39,6 +42,7 @@ __all__ = [
     "calcular_cross",
     "calcular_forward",
     "calcular_hedge",
+    "calcular_opcao",
     "calcular_swap",
     "parse_montante",
     "spot_para",
@@ -48,4 +52,6 @@ __all__ = [
     "EXEMPLOS_GEOGRAFICA",
     "EXEMPLOS_FORWARD_SPOT",
     "EXEMPLO_FORWARD_INPUT",
+    "EXEMPLOS_OPCAO_SPOT",
+    "EXEMPLO_OPCAO_INPUT",
 ]

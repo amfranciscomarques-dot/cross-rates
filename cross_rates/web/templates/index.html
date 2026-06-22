@@ -31,6 +31,9 @@
           <button hx-post="/exemplos/forward" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela"
                   hx-on::after-request="document.getElementById('forward').value = this.dataset.fwd"
                   data-fwd="{{ exemplo_forward }}">Ex. forward (27)</button>
+          <button hx-post="/exemplos/opcao" hx-target="#tabela" hx-swap="outerHTML" hx-include="#tabela"
+                  hx-on::after-request="document.getElementById('opcao').value = this.dataset.opc"
+                  data-opc="{{ exemplo_opcao }}">Ex. opção (GK)</button>
           <button hx-post="/limpar" hx-target="#tabela" hx-swap="outerHTML">Limpar</button>
         </div>
 
@@ -122,6 +125,23 @@
         </div>
       </section>
 
+      <!-- Opções (Garman-Kohlhagen) -->
+      <section class="painel">
+        <h2>Opções cambiais (Garman-Kohlhagen)</h2>
+        <p class="dica">
+          TIPO BASE COTADA strike dias vol i_base(b a) i_cotada(b a) [notional].
+          TIPO = call | put; vol em % anual; o spot vem da tabela. Prémio em
+          COTADA por 1 BASE, com delta, gamma, vega, theta e rho.
+        </p>
+        <form class="linha" hx-post="/opcao" hx-target="#opcao_res" hx-include="#tabela">
+          <input type="text" name="opcao" id="opcao" placeholder="ex.: call EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1 1000000" autocomplete="off">
+          <button class="primario" type="submit">Avaliar</button>
+        </form>
+        <div class="resultado" id="opcao_res">
+          <span class="placeholder">Sem avaliação de opção ainda.</span>
+        </div>
+      </section>
+
     </div>
 
     <aside class="teoria">
@@ -174,6 +194,16 @@ Cross indireto (×) — C em lados opostos:
         <p>Cada cotação BASE/COTADA gera duas conversões dirigidas: BASE→COTADA à
         taxa bid; COTADA→BASE à taxa 1/ask. O bid do cross é o percurso
         BASE→…→COTADA; o ask é 1/(taxa COTADA→…→BASE).</p>
+
+        <h3>8. Opções cambiais (Garman-Kohlhagen)</h3>
+        <p>Opção vanilla sobre BASE/COTADA: a BASE é o ativo (rende r_f), a
+        COTADA o numerário (rende r_d). Black-Scholes adaptado a divisas:</p>
+        <div class="formula-blk">call = S·e^(−r_f·T)·N(d1) − K·e^(−r_d·T)·N(d2)
+d1 = [ln(S/K) + (r_d − r_f + σ²/2)·T] / (σ·√T) ; d2 = d1 − σ·√T</div>
+        <p>O prémio vem em COTADA por 1 BASE. As <b>Gregas</b> medem a
+        sensibilidade: delta (spot), gamma (delta), vega (vol), theta (tempo),
+        rho (taxa doméstica). Vale a paridade put-call
+        <code>C − P = S·e^(−r_f·T) − K·e^(−r_d·T)</code>.</p>
       </div>
     </aside>
   </main>

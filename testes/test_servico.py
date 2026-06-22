@@ -23,6 +23,7 @@ from cross_rates.servico import (
     calcular_cross,
     calcular_forward,
     calcular_hedge,
+    calcular_opcao,
     calcular_swap,
     para_dict,
     parse_montante,
@@ -148,3 +149,41 @@ def test_hedge_tipo_invalido() -> None:
     g = _grafo(("EUR", "USD", "1.08", "1.09"))
     with pytest.raises(CotacaoInvalida):
         calcular_hedge(g, "compra 500000 EUR USD 90 3.1 3.2 4.5 4.6")
+
+
+# --- opção (Garman-Kohlhagen) ---------------------------------------------- #
+
+
+def test_calcular_opcao_call_view_model() -> None:
+    g = _grafo(("EUR", "USD", "1.0990", "1.1010"))
+    r = calcular_opcao(g, "call EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1 1000000")
+    d = para_dict(r)
+    assert d["tipo"] == "call" and d["par"] == "EUR/USD"
+    assert isinstance(d["preco"], str) and Decimal(d["preco"]) > 0
+    assert Decimal(d["preco_total"]) > 0
+    assert all(g in d for g in ("delta", "gamma", "vega", "theta", "rho"))
+
+
+def test_calcular_opcao_put_sem_notional() -> None:
+    g = _grafo(("EUR", "USD", "1.0990", "1.1010"))
+    r = calcular_opcao(g, "put EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1")
+    d = para_dict(r)
+    assert d["tipo"] == "put"
+    assert d["notional"] == "1"  # notional por omissão
+
+
+def test_calcular_opcao_sem_spot() -> None:
+    with pytest.raises(CotacaoInvalida):
+        calcular_opcao(GrafoCambial(), "call EUR USD 1.1 180 10 2.9 3.1 4.9 5.1")
+
+
+def test_calcular_opcao_formato_invalido() -> None:
+    g = _grafo(("EUR", "USD", "1.0990", "1.1010"))
+    with pytest.raises(CotacaoInvalida):
+        calcular_opcao(g, "call EUR USD 1.1 180")  # poucos campos
+
+
+def test_calcular_opcao_tipo_invalido() -> None:
+    g = _grafo(("EUR", "USD", "1.0990", "1.1010"))
+    with pytest.raises(CotacaoInvalida):
+        calcular_opcao(g, "straddle EUR USD 1.1 180 10 2.9 3.1 4.9 5.1")

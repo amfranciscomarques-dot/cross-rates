@@ -30,6 +30,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   with live data instead of an empty table. Unset by default. Degrades
   gracefully (empty table + note) if the feed is unavailable.
 
+**FX options (`nucleo/opcoes.py`)**
+
+- `garman_kohlhagen()` — vanilla European FX option pricing (Black-Scholes for
+  currencies). Returns the premium and the five core Greeks (delta, gamma,
+  vega, theta, rho). `OpcaoVanilla` carries call/put, strike, tenor, notional
+  and the currency pair; the BASE is the asset (earns `r_f`), the COTADA the
+  numéraire (earns `r_d`). Premium in COTADA per 1 BASE.
+- Decimal-native throughout: the standard normal CDF is computed from a
+  non-alternating error-function series (Abramowitz & Stegun 7.1.6), stable for
+  all inputs and free of external dependencies. Cross-checked against the
+  closed form to ~10 significant figures; put-call parity holds exactly.
+- Service op `calcular_opcao()` parses a one-line spec (spot from the table) and
+  the view-model serialises it; exposed in both UIs (`/opcao` web route + a new
+  TUI panel, key `k`).
+
 **Containerisation (`Dockerfile`)**
 
 - Multi-stage `Dockerfile` for the web UI: a builder stage installs the package
@@ -43,7 +58,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Quality**
 
-- `mypy --strict` and the 100% line-coverage gate now extend to `feeds/`.
+- `mypy --strict` and the 100% line-coverage gate now extend to `feeds/` and
+  the new `nucleo/opcoes.py` (options pricing is fully covered, 134 statements).
 - CI now installs the `web` extra (so the web tests actually run) and builds +
   smoke-tests the Docker image on every push/PR (build only, no deploy).
 

@@ -50,6 +50,26 @@ async def test_forward_na_tui():
 
 
 @pytest.mark.asyncio
+async def test_opcao_na_tui():
+    app = CrossRatesApp()
+    async with app.run_test() as pilot:
+        app.action_exemplos_opcao()  # spot EUR/USD + input preenchido (call ATM)
+        await pilot.pause()
+        assert len(app.grafo.cotacoes) == 1
+
+        campo = app.query_one("#opcao")
+        campo.focus()
+        await pilot.pause()
+        await pilot.press("enter")  # input já vem preenchido pelo exemplo
+        await pilot.pause()
+
+        conteudo = str(app.query_one("#opcao_res").render())
+        assert "call" in conteudo.lower()
+        assert "delta" in conteudo.lower()  # Gregas presentes
+        assert "prémio" in conteudo.lower()
+
+
+@pytest.mark.asyncio
 async def test_arbitragem_na_tui():
     app = CrossRatesApp()
     async with app.run_test() as pilot:

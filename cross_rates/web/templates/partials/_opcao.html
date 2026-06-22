@@ -1,0 +1,23 @@
+{# Opção vanilla por Garman-Kohlhagen: prémio + Gregas (espelha _mostrar_opcao da TUI). #}
+<div>
+  <span class="par-grande">{{ r.par }}</span>
+  <b>{{ r.tipo|upper }}</b> strike {{ r.strike }} · {{ r.dias }}d · vol {{ r.vol }}%
+</div>
+<div class="linha-kv">
+  <span class="k">prémio (por 1 {{ r.base }})</span>
+  <span class="bid">{{ r.preco }} {{ r.cotada }}</span>
+</div>
+<div class="linha-kv">
+  <span class="k">prémio total ({{ r.notional }} {{ r.base }})</span>
+  <span class="bid">{{ r.preco_total }} {{ r.cotada }}</span>
+</div>
+<div class="formula">spot(mid) {{ r.spot }} · r_f({{ r.base }})={{ r.juro_base }}% · r_d({{ r.cotada }})={{ r.juro_cotada }}% · d1={{ r.d1 }} · d2={{ r.d2 }}</div>
+
+<h3>Gregas</h3>
+<div class="linha-kv"><span class="k">delta</span><span>{{ r.delta }}</span></div>
+<div class="linha-kv"><span class="k">gamma</span><span>{{ r.gamma }}</span></div>
+<div class="linha-kv"><span class="k">vega (por +1 ponto de vol)</span><span>{{ r.vega }}</span></div>
+<div class="linha-kv"><span class="k">theta (por dia)</span><span>{{ r.theta }}</span></div>
+<div class="linha-kv"><span class="k">rho (por +1 ponto de r_d)</span><span>{{ r.rho }}</span></div>
+
+<div class="nota">{{ r.nota }}</div>

@@ -19,18 +19,23 @@ from cross_rates.nucleo import (
     Cotacao,
     CotacaoInvalida,
     GrafoCambial,
+    OpcaoVanilla,
     ResultadoCross,
     ResultadoForward,
+    ResultadoOpcao,
     SwapOutright,
     TaxaJuro,
+    TipoOpcao,
     analisa_hedging,
     arbitragem_a_prazo,
     arbitragens_geograficas,
     arbitragens_triangulares,
     cross,
     forward,
+    garman_kohlhagen,
     normaliza_moeda,
     outright_de_pontos,
+    para_decimal,
 )
 
 
@@ -138,6 +143,33 @@ def calcular_swap(grafo: GrafoCambial, texto: str) -> SwapOutright:
     spot = _spot_obrigatorio(grafo, base, cotada)
     casas = _inteiro(partes[4], "As casas decimais") if len(partes) == 5 else 4
     return outright_de_pontos(spot, partes[2], partes[3], casas_decimais_pontos=casas)
+
+
+def calcular_opcao(grafo: GrafoCambial, texto: str) -> ResultadoOpcao:
+    """Preço e Gregas de uma opção vanilla (Garman-Kohlhagen).
+
+    Formato: ``TIPO BASE COTADA strike dias vol i_base_bid i_base_ask
+    i_cot_bid i_cot_ask [notional]``. ``TIPO`` = ``call`` | ``put``; ``vol`` em %
+    anual; o spot vem da tabela. ``notional`` (em unidades da base) é opcional.
+    """
+    partes = texto.replace(",", ".").split()
+    if len(partes) not in (10, 11):
+        raise CotacaoInvalida(
+            "Formato: TIPO BASE COTADA strike dias vol i_base(b a) "
+            "i_cotada(b a) [notional]."
+        )
+    tipo_txt = partes[0].lower()
+    if tipo_txt not in ("call", "put"):
+        raise CotacaoInvalida("TIPO deve ser 'call' ou 'put'.")
+    tipo = TipoOpcao.CALL if tipo_txt == "call" else TipoOpcao.PUT
+    base, cotada = partes[1], partes[2]
+    spot = _spot_obrigatorio(grafo, base, cotada)
+    dias = _inteiro(partes[4], "O prazo (dias)")
+    notional = para_decimal(partes[10]) if len(partes) == 11 else para_decimal(1)
+    opcao = OpcaoVanilla(tipo, base, cotada, para_decimal(partes[3]), dias, notional)
+    juro_base = TaxaJuro.de_moeda(base, partes[6], partes[7])
+    juro_cotada = TaxaJuro.de_moeda(cotada, partes[8], partes[9])
+    return garman_kohlhagen(opcao, spot, partes[5], juro_base, juro_cotada)
 
 
 def calcular_hedge(grafo: GrafoCambial, texto: str) -> AnaliseHedging:

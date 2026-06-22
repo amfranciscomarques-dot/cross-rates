@@ -31,3 +31,7 @@ EXEMPLOS_FORWARD_SPOT: tuple[str, ...] = ("CHF", "USD", "1.2745", "1.2748")
 
 # Forward CHF/USD a 180d + forward de mercado 1,3076–1,3079 (tem arbitragem a prazo).
 EXEMPLO_FORWARD_INPUT: str = "CHF USD 180 0.1072 0.1144 4.9379 4.9438 1.3076 1.3079"
+
+# Opção EUR/USD ATM (strike 1,1000) a 180d, vol 10%, notional 1M EUR (GK).
+EXEMPLOS_OPCAO_SPOT: tuple[str, ...] = ("EUR", "USD", "1.0990", "1.1010")
+EXEMPLO_OPCAO_INPUT: str = "call EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1 1000000"

@@ -23,6 +23,7 @@ from cross_rates.nucleo import (
     Cotacao,
     ResultadoCross,
     ResultadoForward,
+    ResultadoOpcao,
     SwapOutright,
 )
 
@@ -168,6 +169,32 @@ def hedge_dict(r: AnaliseHedging) -> dict[str, str]:
     }
 
 
+def opcao_dict(r: ResultadoOpcao) -> dict[str, str]:
+    return {
+        "tipo": r.tipo,
+        "par": r.par,
+        "base": r.base,
+        "cotada": r.cotada,
+        "strike": fmt(r.strike),
+        "dias": str(r.dias),
+        "notional": fmt(r.notional),
+        "spot": fmt(r.spot, 4),
+        "vol": fmt(r.vol),
+        "juro_base": fmt(r.juro_base, 4),
+        "juro_cotada": fmt(r.juro_cotada, 4),
+        "d1": fmt(r.d1, 4),
+        "d2": fmt(r.d2, 4),
+        "preco": fmt(r.preco, 6),
+        "preco_total": fmt(r.preco_total, 2),
+        "delta": fmt(r.delta, 4),
+        "gamma": fmt(r.gamma, 4),
+        "vega": fmt(r.vega, 6),
+        "theta": fmt(r.theta, 6),
+        "rho": fmt(r.rho, 6),
+        "nota": r.nota,
+    }
+
+
 def para_dict(obj: Any, montante: Montante = None) -> dict[str, Any]:
     """Despacha para o conversor adequado ao tipo do resultado do núcleo."""
     if isinstance(obj, Cotacao):
@@ -186,4 +213,6 @@ def para_dict(obj: Any, montante: Montante = None) -> dict[str, Any]:
         return swap_dict(obj)
     if isinstance(obj, AnaliseHedging):
         return hedge_dict(obj)
+    if isinstance(obj, ResultadoOpcao):
+        return opcao_dict(obj)
     raise TypeError(f"Tipo sem serializador: {type(obj).__name__}")

@@ -142,6 +142,23 @@ def test_forward_com_arbitragem_a_prazo(cliente: TestClient) -> None:
     assert "prémio" in r.text or "desconto" in r.text
 
 
+def test_opcao_avalia_call(cliente: TestClient) -> None:
+    cots = ["EUR USD 1.0990 1.1010"]
+    r = cliente.post(
+        "/opcao",
+        data={"opcao": "call EUR USD 1.1000 180 10 2.9 3.1 4.9 5.1 1000000", "cotacoes": cots},
+    )
+    assert r.status_code == 200
+    assert "EUR/USD" in r.text
+    assert "delta" in r.text.lower() and "gamma" in r.text.lower()
+
+
+def test_opcao_formato_invalido_devolve_erro(cliente: TestClient) -> None:
+    r = cliente.post("/opcao", data={"opcao": "call EUR USD", "cotacoes": []})
+    assert r.status_code == 200
+    assert "erro" in r.text.lower()
+
+
 def test_swap_e_hedge(cliente: TestClient) -> None:
     cots = ["EUR USD 1.0850 1.0852"]
     r = cliente.post("/swap", data={"swap": "EUR USD 20 30", "cotacoes": cots})
